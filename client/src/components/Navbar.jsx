@@ -8,17 +8,12 @@ import {
   Moon,
   Search,
   Menu,
-  X,
-  Feather,
-  Database
+  X
 } from 'lucide-react';
-import { isSupabaseConfigured } from '../services/supabase';
-
 import { GyaniLogo } from './GyaniLogo';
 
 export function Navbar({ activeTab, setActiveTab, theme, toggleTheme, onOpenSearch }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const connectedToSupabase = isSupabaseConfigured();
 
   const navItems = [
     { id: 'overview', label: 'Index', icon: LayoutDashboard },

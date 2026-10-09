@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Lock, 
   X, 
@@ -36,12 +36,11 @@ export function AdminPanel({
   docs, 
   onRefreshData 
 }) {
+  const [currentUser, setCurrentUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('gyani_admin_auth') === 'true' || localStorage.getItem('aethervault_admin_auth') === 'true';
+    return localStorage.getItem('gyani_admin_auth') === 'true';
   });
 
-  const [authMode, setAuthMode] = useState('passphrase');
-  const [passphrase, setPassphrase] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
@@ -59,6 +58,40 @@ export function AdminPanel({
   const [configSuccess, setConfigSuccess] = useState('');
   const [sqlCopied, setSqlCopied] = useState(false);
 
+
+  // Automatically sync Supabase Auth session
+  useEffect(() => {
+    if (isSupabaseConfigured() && supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session?.user) {
+          setIsAuthenticated(true);
+          setCurrentUser(session.user);
+          localStorage.setItem('gyani_admin_auth', 'true');
+        } else {
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+          localStorage.removeItem('gyani_admin_auth');
+        }
+      }).catch((err) => {
+        console.warn('Session check warning:', err);
+      });
+
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          setIsAuthenticated(true);
+          setCurrentUser(session.user);
+          localStorage.setItem('gyani_admin_auth', 'true');
+        } else {
+          setIsAuthenticated(false);
+          setCurrentUser(null);
+          localStorage.removeItem('gyani_admin_auth');
+        }
+      });
+
+      return () => subscription?.unsubscribe?.();
+    }
+  }, []);
+
   if (!isOpen) return null;
 
   const showNotification = (msg) => {
@@ -71,45 +104,45 @@ export function AdminPanel({
     setLoginError('');
     setIsSubmitting(true);
 
-    if (authMode === 'passphrase') {
-      if (passphrase === 'admin' || passphrase === 'admin123' || passphrase === 'master' || passphrase.length >= 4) {
-        setIsAuthenticated(true);
-        localStorage.setItem('gyani_admin_auth', 'true');
-        setIsSubmitting(false);
-      } else {
-        setLoginError('Passphrase must be at least 4 characters (e.g. admin123)');
-        setIsSubmitting(false);
-      }
+    if (!isSupabaseConfigured() || !supabase) {
+      setLoginError('Supabase client is not connected. Please verify your Supabase URL & Key in Supabase Setup.');
+      setIsSubmitting(false);
       return;
     }
 
-    if (authMode === 'supabase') {
-      if (!isSupabaseConfigured() || !supabase) {
-        setLoginError('Supabase is not configured yet. Configure URL & Key below or use Master Passphrase.');
-        setIsSubmitting(false);
-        return;
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password
+      });
+
+      if (error) {
+        setLoginError(error.message || 'Invalid administrator email or password.');
+      } else if (data?.user) {
+        setIsAuthenticated(true);
+        setCurrentUser(data.user);
+        localStorage.setItem('gyani_admin_auth', 'true');
+        showNotification('Authenticated successfully with Supabase!');
       }
-      try {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) {
-          setLoginError(error.message);
-        } else {
-          setIsAuthenticated(true);
-          localStorage.setItem('gyani_admin_auth', 'true');
-        }
-      } catch (err) {
-        setLoginError('Authentication failed: ' + err.message);
-      } finally {
-        setIsSubmitting(false);
-      }
+    } catch (err) {
+      setLoginError('Authentication error: ' + (err.message || err));
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setIsAuthenticated(false);
+    setCurrentUser(null);
     localStorage.removeItem('gyani_admin_auth');
-    localStorage.removeItem('aethervault_admin_auth');
-    if (supabase) supabase.auth.signOut();
+    if (supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.warn('Sign out warning:', e);
+      }
+    }
+    showNotification('Signed out of curator session.');
   };
 
   const handleSaveProject = async (e) => {
@@ -306,23 +339,28 @@ export function AdminPanel({
         style={{ maxWidth: '940px' }}
       >
         {/* Top Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '22px', borderBottom: '1px solid var(--border-color)', paddingBottom: '14px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div className="admin-header">
+          <div className="admin-header-brand">
             <GyaniLogo size="sm" showSubtext={false} />
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                 <span className="paper-stamp paper-stamp-active">ADMIN REGISTRY</span>
-                <span className="paper-stamp">
+                <span className={`paper-stamp ${isSupabaseConfigured() ? 'paper-stamp-sage' : ''}`}>
                   {isSupabaseConfigured() ? 'SUPABASE LIVE' : 'LOCAL SANDBOX'}
                 </span>
               </div>
-              <h2 style={{ fontSize: '1.25rem', color: 'var(--text-primary)', marginTop: '2px' }}>
+              <h2 style={{ fontSize: '1.2rem', color: 'var(--text-primary)', marginTop: '2px', lineHeight: 1.25 }}>
                 Gyani Curator Console
               </h2>
+              {currentUser?.email && (
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                  User: {currentUser.email}
+                </div>
+              )}
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div className="admin-header-actions">
             {isAuthenticated && (
               <>
                 <button 
@@ -372,119 +410,94 @@ export function AdminPanel({
           </div>
         )}
 
-        {/* NOT AUTHENTICATED: Login Form */}
+        {/* NOT AUTHENTICATED: Supabase Auth Login Form */}
         {!isAuthenticated ? (
-          <div style={{ maxWidth: '420px', margin: '28px auto' }}>
-            <div className="paper-panel-subtle" style={{ padding: '28px', textAlign: 'center' }}>
-              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '16px' }}>
+          <div style={{ maxWidth: '440px', margin: '20px auto', width: '100%' }}>
+            <div className="paper-panel-subtle" style={{ padding: 'clamp(20px, 4vw, 32px)', textAlign: 'center' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '14px' }}>
                 <GyaniLogo size="md" />
               </div>
 
-              <h3 style={{ fontSize: '1.25rem', marginBottom: '6px' }}>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+                <span className="paper-stamp paper-stamp-active" style={{ fontSize: '0.72rem' }}>
+                  <Lock size={11} />
+                  SUPABASE AUTHENTICATION
+                </span>
+              </div>
+
+              <h3 style={{ fontSize: '1.25rem', marginBottom: '6px', color: 'var(--text-primary)' }}>
                 Curator Authentication
               </h3>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px', fontFamily: 'var(--font-serif)' }}>
-                Access the Gyani repository to publish projects, upload docx/PDF manuscripts, and author documentation.
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '20px', fontFamily: 'var(--font-serif)', lineHeight: 1.5 }}>
+                Sign in with your authorized Supabase administrator credentials to manage projects, documents, and wiki pages.
               </p>
-
-              <div style={{ display: 'flex', gap: '6px', marginBottom: '18px', background: 'var(--bg-tertiary)', padding: '3px', borderRadius: '4px' }}>
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('passphrase')}
-                  className={`paper-stamp ${authMode === 'passphrase' ? 'paper-stamp-active' : ''}`}
-                  style={{ flex: 1, justifyContent: 'center', cursor: 'pointer', border: 'none' }}
-                >
-                  Master Passkey
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAuthMode('supabase')}
-                  className={`paper-stamp ${authMode === 'supabase' ? 'paper-stamp-active' : ''}`}
-                  style={{ flex: 1, justifyContent: 'center', cursor: 'pointer', border: 'none' }}
-                >
-                  Supabase Auth
-                </button>
-              </div>
 
               {loginError && (
                 <div style={{
-                  padding: '8px 12px',
+                  padding: '10px 14px',
                   borderRadius: '4px',
                   background: 'var(--accent-stamp-bg)',
                   color: 'var(--accent-stamp)',
                   fontSize: '0.8rem',
-                  marginBottom: '14px',
-                  textAlign: 'left'
+                  marginBottom: '16px',
+                  textAlign: 'left',
+                  border: '1px solid var(--accent-stamp)'
                 }}>
                   {loginError}
                 </div>
               )}
 
-              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '12px', textAlign: 'left' }}>
-                {authMode === 'passphrase' ? (
-                  <div>
-                    <label style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                      MASTER PASSKEY
-                    </label>
-                    <input
-                      type="password"
-                      placeholder="admin123"
-                      value={passphrase}
-                      onChange={(e) => setPassphrase(e.target.value)}
-                      className="paper-input"
-                      required
-                    />
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                      Tip: Enter <code>admin123</code> for immediate curator access.
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div>
-                      <label style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        SUPABASE EMAIL
-                      </label>
-                      <input
-                        type="email"
-                        placeholder="admin@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="paper-input"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        PASSWORD
-                      </label>
-                      <input
-                        type="password"
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="paper-input"
-                        required
-                      />
-                    </div>
-                  </>
-                )}
+              <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px', textAlign: 'left' }}>
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    ADMINISTRATOR EMAIL
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="curator@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="paper-input"
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
+                    PASSWORD
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="••••••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="paper-input"
+                    required
+                  />
+                </div>
 
                 <button
                   type="submit"
                   disabled={isSubmitting}
                   className="paper-btn paper-btn-primary"
-                  style={{ marginTop: '8px', padding: '10px' }}
+                  style={{ marginTop: '6px', padding: '11px', width: '100%', justifyContent: 'center' }}
                 >
-                  {isSubmitting ? 'Authenticating...' : 'Unlock Archive Manager'}
+                  <Lock size={14} />
+                  <span>{isSubmitting ? 'Verifying with Supabase...' : 'Unlock Curator Console'}</span>
                 </button>
               </form>
+
+              <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid var(--border-color)', fontSize: '0.72rem', color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
+                Secured strictly via Supabase Auth. Master passkey access has been permanently disabled.
+              </div>
             </div>
           </div>
         ) : (
           /* AUTHENTICATED: Full Management Interface */
           <div>
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', marginBottom: '20px', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
+            <div className="admin-tabs-bar">
               <button
                 onClick={() => { setActiveTab('projects'); setEditingProject(null); }}
                 className={`paper-stamp ${activeTab === 'projects' ? 'paper-stamp-active' : ''}`}
@@ -551,8 +564,7 @@ export function AdminPanel({
                       {projects.map(proj => (
                         <div 
                           key={proj.id} 
-                          className="paper-panel-subtle" 
-                          style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px' }}
+                          className="paper-panel-subtle admin-item-row"
                         >
                           <div>
                             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
@@ -586,12 +598,12 @@ export function AdminPanel({
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleSaveProject} className="paper-panel-subtle" style={{ padding: '20px' }}>
+                  <form onSubmit={handleSaveProject} className="paper-panel-subtle admin-form-padding">
                     <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>
                       {editingProject.id ? 'Edit Project Entry' : 'Create New Project Entry'}
                     </h3>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '14px', marginBottom: '14px' }}>
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                           PROJECT TITLE
@@ -759,8 +771,7 @@ export function AdminPanel({
                       {notes.map(note => (
                         <div 
                           key={note.id} 
-                          className="paper-panel-subtle" 
-                          style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px' }}
+                          className="paper-panel-subtle admin-item-row"
                         >
                           <div>
                             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
@@ -793,7 +804,7 @@ export function AdminPanel({
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleSaveNote} className="paper-panel-subtle" style={{ padding: '20px' }}>
+                  <form onSubmit={handleSaveNote} className="paper-panel-subtle admin-form-padding">
                     <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>
                       {editingNote.id ? 'Edit Manuscript Record' : 'Upload New Document'}
                     </h3>
@@ -820,7 +831,7 @@ export function AdminPanel({
                       />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '14px', marginBottom: '14px' }}>
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                           TITLE
@@ -967,8 +978,7 @@ export function AdminPanel({
                       {docs.map(doc => (
                         <div 
                           key={doc.id} 
-                          className="paper-panel-subtle" 
-                          style={{ padding: '14px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '14px' }}
+                          className="paper-panel-subtle admin-item-row"
                         >
                           <div>
                             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
@@ -1001,12 +1011,12 @@ export function AdminPanel({
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleSaveDoc} className="paper-panel-subtle" style={{ padding: '20px' }}>
+                  <form onSubmit={handleSaveDoc} className="paper-panel-subtle admin-form-padding">
                     <h3 style={{ fontSize: '1.2rem', marginBottom: '16px' }}>
                       {editingDoc.id ? 'Edit Documentation Page' : 'Author Documentation Page'}
                     </h3>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '14px', marginBottom: '14px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '14px', marginBottom: '14px' }}>
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                           ARTICLE TITLE

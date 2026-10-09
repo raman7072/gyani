@@ -19,14 +19,9 @@ import {
 } from './services/supabase';
 import {
   Database,
-  BookOpen,
-  ArrowUpRight,
-  Bookmark,
   Command
 } from 'lucide-react';
-import { GithubIcon } from './components/GithubIcon';
 
-export 
 // Helper to detect if current URL targets admin portal (#admin, #/admin, ?admin, /admin)
 const isAdminRoute = () => {
   if (typeof window === 'undefined') return false;
@@ -55,7 +50,6 @@ function App() {
   const [projects, setProjects] = useState(INITIAL_PROJECTS);
   const [notes, setNotes] = useState(INITIAL_NOTES);
   const [docs, setDocs] = useState(INITIAL_DOCS);
-  const [isLoading, setIsLoading] = useState(true);
 
   // Modals
   const [selectedNote, setSelectedNote] = useState(null);
@@ -72,7 +66,6 @@ function App() {
 
   // Load data from Supabase / Local storage
   const loadAllData = async () => {
-    setIsLoading(true);
     try {
       const [projData, noteData, docData] = await Promise.all([
         api.getProjects(),
@@ -84,8 +77,6 @@ function App() {
       setDocs(docData);
     } catch (err) {
       console.error('Error fetching data:', err);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -244,6 +235,7 @@ function App() {
               onNavigate={handleNavigateTab}
               onOpenProjectModal={setSelectedProject}
               onOpenNoteModal={setSelectedNote}
+              onOpenSearch={() => setSearchOpen(true)}
             />
           )}
 

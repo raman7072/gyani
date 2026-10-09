@@ -7,7 +7,6 @@ import {
   Check, 
   Clock, 
   Calendar, 
-  Bookmark,
   Info, 
   Lightbulb
 } from 'lucide-react';
