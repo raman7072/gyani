@@ -1,0 +1,13 @@
+{
+  "name": "gyani",
+  "version": "1.0.0",
+  "description": "Gyani — Minimalist Paper & Ink Knowledge Archive",
+  "main": "index.js",
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "preview": "npm --prefix client run preview"
+  },
+  "author": "",
+  "license": "ISC"
+}
