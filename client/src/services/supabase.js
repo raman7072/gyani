@@ -1,12 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Default Supabase config from Vite env vars or local storage override
+const DEFAULT_SUPABASE_URL = 'https://ibrgcyqcvybaapzewvya.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_oTiygcwZSzQiML6o5pgiyQ_vrXN7Gxp';
+
+// Default Supabase config from local storage override, Vite env vars, or production defaults
 const getEnvConfig = () => {
   const localUrl = localStorage.getItem('custom_supabase_url');
   const localKey = localStorage.getItem('custom_supabase_key');
 
-  const supabaseUrl = localUrl || import.meta.env.VITE_SUPABASE_URL || '';
-  const supabaseAnonKey = localKey || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const supabaseUrl = localUrl || import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+  const supabaseAnonKey = localKey || import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 
   return { supabaseUrl, supabaseAnonKey };
 };

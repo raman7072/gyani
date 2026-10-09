@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Overview } from './components/Overview';
@@ -25,7 +26,17 @@ import {
 } from 'lucide-react';
 import { GithubIcon } from './components/GithubIcon';
 
-export function App() {
+export 
+// Helper to detect if current URL targets admin portal (#admin, #/admin, ?admin, /admin)
+const isAdminRoute = () => {
+  if (typeof window === 'undefined') return false;
+  const hash = (window.location.hash || '').toLowerCase().replace(/^#[/]?/, '').replace(/[/]$/, '');
+  const path = (window.location.pathname || '').toLowerCase();
+  const search = (window.location.search || '').toLowerCase();
+  return hash === 'admin' || path.endsWith('/admin') || path.endsWith('/admin/') || search.includes('admin');
+};
+
+function App() {
   // Theme state: defaults to light (natural warm paper) or dark (e-ink night screen)
   const [theme, setTheme] = useState(() => {
     return localStorage.getItem('gyani_theme') || localStorage.getItem('aethervault_theme') || 'light';
@@ -49,9 +60,7 @@ export function App() {
   // Modals
   const [selectedNote, setSelectedNote] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
-  const [adminOpen, setAdminOpen] = useState(() => {
-    return window.location.hash === '#admin';
-  });
+  const [adminOpen, setAdminOpen] = useState(() => isAdminRoute());
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -84,21 +93,25 @@ export function App() {
     loadAllData();
   }, []);
 
-  // Listen to hash changes (e.g., #admin)
+  // Listen to hash & history changes (e.g., #admin, /admin, ?admin)
   useEffect(() => {
-    const handleHashChange = () => {
-      if (window.location.hash === '#admin') {
+    const handleUrlChange = () => {
+      if (isAdminRoute()) {
         setAdminOpen(true);
       }
     };
-    window.addEventListener('hashchange', handleHashChange);
-    return () => window.removeEventListener('hashchange', handleHashChange);
+    window.addEventListener('hashchange', handleUrlChange);
+    window.addEventListener('popstate', handleUrlChange);
+    return () => {
+      window.removeEventListener('hashchange', handleUrlChange);
+      window.removeEventListener('popstate', handleUrlChange);
+    };
   }, []);
 
   const handleCloseAdmin = () => {
     setAdminOpen(false);
-    if (window.location.hash === '#admin') {
-      window.history.pushState(null, '', window.location.pathname + window.location.search);
+    if (isAdminRoute()) {
+      window.history.pushState(null, "", window.location.pathname);
     }
   };
 
@@ -107,6 +120,13 @@ export function App() {
     const handleKeyDown = (e) => {
       const tag = e.target.tagName;
       const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable;
+
+      // Curator hotkey: Cmd+Shift+A or Ctrl+Shift+A
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setAdminOpen(prev => !prev);
+        return;
+      }
 
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
@@ -301,10 +321,15 @@ export function App() {
               }}>?</kbd>
             </button>
 
-            <div className="paper-stamp">
+            <button
+              onClick={() => setAdminOpen(true)}
+              className="paper-stamp"
+              style={{ cursor: 'pointer', background: 'transparent' }}
+              title="Curator Console (or press ⌘Shift+A / visit /#admin)"
+            >
               <Database size={11} />
               <span>{isSupabaseConfigured() ? 'inSync' : 'Local'}</span>
-            </div>
+            </button>
           </div>
         </div>
       </footer>

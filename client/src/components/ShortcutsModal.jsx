@@ -13,6 +13,7 @@ export function ShortcutsModal({ isOpen, onClose }) {
     { key: 'T', description: 'Toggle between Warm Paper and E-Ink Slate modes', icon: Moon },
     { key: 'Esc', description: 'Close any active reader, detail modal or search', icon: X },
     { key: '?', description: 'Toggle this keyboard shortcuts cheat sheet', icon: Command },
+    { key: '⌘⇧A / Ctrl+Shift+A', description: 'Open Curator Admin Console', icon: Command },
   ];
 
   return (

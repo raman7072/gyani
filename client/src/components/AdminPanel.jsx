@@ -15,7 +15,8 @@ import {
   FileText, 
   BookOpen, 
   LogOut, 
-  Code2
+  Code2,
+  Download
 } from 'lucide-react';
 import { 
   api, 
