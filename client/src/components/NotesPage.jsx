@@ -4,11 +4,22 @@ import {
   Download, 
   Eye, 
   Search, 
-  HardDrive
+  HardDrive,
+  Share2,
+  Check
 } from 'lucide-react';
+import { copyShareLink } from '../utils/share';
 
 export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [copiedId, setCopiedId] = useState('');
+
+  const handleShareNote = async (e, note) => {
+    e.stopPropagation();
+    await copyShareLink('note', note.id, note.title);
+    setCopiedId(note.id);
+    setTimeout(() => setCopiedId(''), 2200);
+  };
   const [selectedFormat, setSelectedFormat] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
@@ -205,6 +216,15 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
                 >
                   <Eye size={13} />
                   <span>View Form</span>
+                </button>
+
+                <button
+                  onClick={(e) => handleShareNote(e, note)}
+                  className="paper-btn paper-btn-sm"
+                  title="Copy direct share link to this note"
+                >
+                  {copiedId === note.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
+                  <span>{copiedId === note.id ? 'Copied' : 'Share'}</span>
                 </button>
 
                 <button

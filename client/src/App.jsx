@@ -54,6 +54,7 @@ function App() {
   // Modals
   const [selectedNote, setSelectedNote] = useState(null);
   const [selectedProject, setSelectedProject] = useState(null);
+  const [selectedDocId, setSelectedDocId] = useState(null);
   const [adminOpen, setAdminOpen] = useState(() => isAdminRoute());
   const [searchOpen, setSearchOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -84,12 +85,69 @@ function App() {
     loadAllData();
   }, []);
 
-  // Listen to hash & history changes (e.g., #admin, /admin, ?admin)
+  // Synchronize active tab and modals with URL hash (#project=id, #note=id, #doc=id/slug, #admin, etc.)
+  const syncRouteFromHash = () => {
+    if (typeof window === 'undefined') return;
+    const rawHash = (window.location.hash || '').trim();
+
+    if (isAdminRoute()) {
+      setAdminOpen(true);
+      return;
+    }
+
+    // Direct Project link: #project=xyz or #projects?id=xyz
+    const projMatch = rawHash.match(/^#\/?projects?(?:[=?&](?:id=)?([a-zA-Z0-9_.-]+)|$)/i);
+    if (projMatch) {
+      setActiveTab('projects');
+      const targetId = projMatch[1];
+      if (targetId) {
+        const found = projects.find(p => String(p.id) === targetId || p.title?.toLowerCase().replace(/\s+/g, '-') === targetId.toLowerCase());
+        if (found) setSelectedProject(found);
+      }
+      return;
+    }
+
+    // Direct Note / Manuscript link: #note=xyz or #notes?id=xyz
+    const noteMatch = rawHash.match(/^#\/?notes?(?:[=?&](?:id=)?([a-zA-Z0-9_.-]+)|$)/i);
+    if (noteMatch) {
+      setActiveTab('notes');
+      const targetId = noteMatch[1];
+      if (targetId) {
+        const found = notes.find(n => String(n.id) === targetId);
+        if (found) setSelectedNote(found);
+      }
+      return;
+    }
+
+    // Direct Documentation link by auto-assigned index (#doc=1, #doc=2, etc.)
+    const docMatch = rawHash.match(/^#\/?docs?(?:[=?/&](?:id=|slug=|index=)?([a-zA-Z0-9_.-]+)|$)/i);
+    if (docMatch) {
+      setActiveTab('docs');
+      const targetId = docMatch[1];
+      if (targetId) {
+        setSelectedDocId(targetId);
+      }
+      return;
+    }
+
+    // Standard primary tab links: #overview, #projects, #notes, #docs
+    const cleanTab = rawHash.replace(/^#\/?/, '').toLowerCase();
+    if (['projects', 'notes', 'docs', 'overview'].includes(cleanTab)) {
+      setActiveTab(cleanTab);
+      setSelectedProject(null);
+      setSelectedNote(null);
+    }
+  };
+
+  // Re-sync hash route whenever data loads from backend or localStorage
+  useEffect(() => {
+    syncRouteFromHash();
+  }, [projects, notes, docs]);
+
+  // Listen to browser navigation (Back / Forward / direct link pasting)
   useEffect(() => {
     const handleUrlChange = () => {
-      if (isAdminRoute()) {
-        setAdminOpen(true);
-      }
+      syncRouteFromHash();
     };
     window.addEventListener('hashchange', handleUrlChange);
     window.addEventListener('popstate', handleUrlChange);
@@ -97,7 +155,7 @@ function App() {
       window.removeEventListener('hashchange', handleUrlChange);
       window.removeEventListener('popstate', handleUrlChange);
     };
-  }, []);
+  }, [projects, notes, docs]);
 
   const handleCloseAdmin = () => {
     setAdminOpen(false);
@@ -165,6 +223,32 @@ function App() {
     }
   };
 
+  const handleOpenProject = (project) => {
+    setSelectedProject(project);
+    window.history.pushState(null, '', `#project=${encodeURIComponent(project.id)}`);
+  };
+
+  const handleCloseProject = () => {
+    setSelectedProject(null);
+    window.history.pushState(null, '', '#projects');
+  };
+
+  const handleOpenNote = (note) => {
+    setSelectedNote(note);
+    window.history.pushState(null, '', `#note=${encodeURIComponent(note.id)}`);
+  };
+
+  const handleCloseNote = () => {
+    setSelectedNote(null);
+    window.history.pushState(null, '', '#notes');
+  };
+
+  const handleSelectDoc = (doc) => {
+    const docIndex = doc.order_index ?? (docs.findIndex(d => d.id === doc.id) + 1);
+    setSelectedDocId(String(docIndex));
+    window.history.pushState(null, '', `#doc=${docIndex}`);
+  };
+
   // Toggle Dark/Light mode
   const toggleTheme = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -225,7 +309,7 @@ function App() {
       />
 
       {/* Main Content Area */}
-      <main className="main-container">
+      <main className={`main-container ${activeTab === "docs" ? "main-container-wide" : ""}`}>
         <div key={activeTab} className="paper-tab-fade">
           {activeTab === 'overview' && (
             <Overview
@@ -233,8 +317,8 @@ function App() {
               notes={notes}
               docs={docs}
               onNavigate={handleNavigateTab}
-              onOpenProjectModal={setSelectedProject}
-              onOpenNoteModal={setSelectedNote}
+              onOpenProjectModal={handleOpenProject}
+              onOpenNoteModal={handleOpenNote}
               onOpenSearch={() => setSearchOpen(true)}
             />
           )}
@@ -242,14 +326,14 @@ function App() {
           {activeTab === 'projects' && (
             <ProjectsPage
               projects={projects}
-              onOpenProjectModal={setSelectedProject}
+              onOpenProjectModal={handleOpenProject}
             />
           )}
 
           {activeTab === 'notes' && (
             <NotesPage
               notes={notes}
-              onOpenNoteModal={setSelectedNote}
+              onOpenNoteModal={handleOpenNote}
               onDownloadNote={handleDownloadNote}
             />
           )}
@@ -257,6 +341,8 @@ function App() {
           {activeTab === 'docs' && (
             <DocsPage
               docs={docs}
+              activeDocId={selectedDocId}
+              onSelectDoc={handleSelectDoc}
             />
           )}
         </div>
@@ -329,13 +415,13 @@ function App() {
       {/* Modals */}
       <NoteViewerModal
         note={selectedNote}
-        onClose={() => setSelectedNote(null)}
+        onClose={handleCloseNote}
         onDownload={handleDownloadNote}
       />
 
       <ProjectDetailsModal
         project={selectedProject}
-        onClose={() => setSelectedProject(null)}
+        onClose={handleCloseProject}
       />
 
       <AdminPanel

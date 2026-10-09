@@ -8,14 +8,29 @@ import {
   Clock, 
   Calendar, 
   Info, 
-  Lightbulb
+  Lightbulb,
+  Share2,
+  PanelLeft,
+  Maximize2
 } from 'lucide-react';
+import { copyShareLink } from '../utils/share';
 
-export function DocsPage({ docs }) {
-  const [activeDocId, setActiveDocId] = useState(docs[0]?.id || '');
+export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
+  const [internalDocId, setInternalDocId] = useState(docs[0]?.id || '');
   const [searchTopic, setSearchTopic] = useState('');
   const [copiedSnippet, setCopiedSnippet] = useState('');
+  const [copiedShare, setCopiedShare] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+
+  const activeDocId = controlledDocId || internalDocId;
+
+  React.useEffect(() => {
+    if (controlledDocId) {
+      setInternalDocId(controlledDocId);
+    }
+  }, [controlledDocId]);
 
   // Track reading progress on scroll
   React.useEffect(() => {
@@ -30,16 +45,48 @@ export function DocsPage({ docs }) {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  const handleSelectDoc = (id) => {
-    setActiveDocId(id);
+  const handleSelectDoc = (doc) => {
+    const docIndex = doc.order_index ?? (docs.findIndex(d => d.id === doc.id) + 1);
+    setInternalDocId(String(docIndex));
+    if (onSelectDoc) {
+      onSelectDoc(doc);
+    } else {
+      window.history.pushState(null, '', `#doc=${docIndex}`);
+    }
     const contentArea = document.querySelector('.docs-content-area');
     if (contentArea) {
       contentArea.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
+  const handleShareDoc = async () => {
+    if (!currentDoc) return;
+    const docIndex = currentDoc.order_index ?? (docs.findIndex(d => d.id === currentDoc.id) + 1);
+    await copyShareLink('doc', docIndex, currentDoc.title);
+    setCopiedShare(true);
+    setTimeout(() => setCopiedShare(false), 2200);
+  };
+
   const currentDoc = useMemo(() => {
-    return docs.find(d => d.id === activeDocId) || docs[0];
+    if (!docs.length) return null;
+    if (!activeDocId) return docs[0];
+
+    // 1. Try matching by numerical order_index (auto-assigned index like #doc=1, #doc=2)
+    const num = parseInt(activeDocId, 10);
+    if (!isNaN(num)) {
+      const byOrder = docs.find(d => Number(d.order_index) === num);
+      if (byOrder) return byOrder;
+      // Fallback: 1-based document position
+      if (num >= 1 && num <= docs.length) {
+        return docs[num - 1];
+      }
+    }
+
+    // 2. Fallback: match by UUID id or string slug for compatibility
+    const bySlugOrId = docs.find(d => String(d.id) === String(activeDocId) || d.slug === activeDocId);
+    if (bySlugOrId) return bySlugOrId;
+
+    return docs[0];
   }, [docs, activeDocId]);
 
   const groupedDocs = useMemo(() => {
@@ -318,9 +365,10 @@ export function DocsPage({ docs }) {
       </div>
 
       {/* Docs Layout */}
-      <div className="docs-layout">
+      <div className={`docs-layout ${sidebarCollapsed ? 'sidebar-collapsed' : ''} ${focusMode ? 'focus-mode' : ''}`}>
         {/* Left Sidebar: Categories & Article Directory */}
-        <aside className="paper-panel docs-sidebar">
+        {!sidebarCollapsed && !focusMode && (
+          <aside className="paper-panel docs-sidebar">
           {/* Quick Filter */}
           <div style={{ position: 'relative', marginBottom: '16px' }}>
             <Search size={14} color="var(--text-tertiary)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -351,7 +399,7 @@ export function DocsPage({ docs }) {
                     return (
                       <button
                         key={doc.id}
-                        onClick={() => handleSelectDoc(doc.id)}
+                        onClick={() => handleSelectDoc(doc)}
                         style={{
                           textAlign: 'left',
                           padding: '7px 10px',
@@ -380,18 +428,43 @@ export function DocsPage({ docs }) {
             ))}
           </div>
         </aside>
+        )}
 
         {/* Center Content: Article Renderer */}
         <main className="paper-panel docs-content-area">
           {currentDoc ? (
             <div>
-              {/* Category Breadcrumbs */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: '14px', fontFamily: 'var(--font-mono)' }}>
-                <span>DOCS</span>
-                <ChevronRight size={11} />
-                <span>{currentDoc.category}</span>
-                <ChevronRight size={11} />
-                <span style={{ color: 'var(--text-primary)' }}>{currentDoc.title}</span>
+              {/* Category Breadcrumbs & Reader Canvas Controls */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+                  <span>DOCS</span>
+                  <ChevronRight size={11} />
+                  <span>{currentDoc.category}</span>
+                  <ChevronRight size={11} />
+                  <span style={{ color: 'var(--text-primary)' }}>{currentDoc.title}</span>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <button
+                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                    className={`paper-btn paper-btn-sm ${sidebarCollapsed ? 'paper-btn-primary' : ''}`}
+                    title={sidebarCollapsed ? "Show topics directory" : "Expand preview: collapse topics directory"}
+                    style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                  >
+                    <PanelLeft size={13} />
+                    <span>{sidebarCollapsed ? "Show Directory" : "Wide Canvas"}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setFocusMode(!focusMode)}
+                    className={`paper-btn paper-btn-sm ${focusMode ? 'paper-btn-primary' : ''}`}
+                    title={focusMode ? "Exit focus mode" : "Full width reading mode without sidebars"}
+                    style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                  >
+                    <Maximize2 size={12} />
+                    <span>{focusMode ? "Standard" : "Focus"}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Document Title */}
@@ -400,19 +473,69 @@ export function DocsPage({ docs }) {
               </h1>
 
               {/* Meta info bar */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', fontSize: '0.78rem', color: 'var(--text-tertiary)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', marginBottom: '22px', fontFamily: 'var(--font-mono)' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Clock size={12} />
-                  <span>~{docReadTime} MIN READ ({docWordCount.toLocaleString()} WORDS)</span>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Calendar size={12} />
-                  <span>UPDATED RECENTLY</span>
-                </span>
-                <span>
-                  SLUG: /{currentDoc.slug}
-                </span>
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', fontSize: '0.78rem', color: 'var(--text-tertiary)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', marginBottom: '22px', fontFamily: 'var(--font-mono)' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Clock size={12} />
+                    <span>~{docReadTime} MIN READ ({docWordCount.toLocaleString()} WORDS)</span>
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <Calendar size={12} />
+                    <span>UPDATED RECENTLY</span>
+                  </span>
+                  <span>
+                    INDEX: #{currentDoc.order_index ?? (currentIndex + 1)}
+                  </span>
+                </div>
+
+                <button
+                  onClick={handleShareDoc}
+                  className="paper-btn paper-btn-sm"
+                  title="Copy shareable link to this document"
+                  style={{ padding: '3px 9px', fontSize: '0.74rem' }}
+                >
+                  {copiedShare ? <Check size={12} color="var(--accent-stamp-sage)" /> : <Share2 size={12} />}
+                  <span>{copiedShare ? 'Link Copied!' : 'Share Doc'}</span>
+                </button>
               </div>
+
+              {/* In-content Table of Contents for Tablet/Mobile where right sidebar is hidden */}
+              {tocHeadings.length > 0 && (
+                <div className="docs-inline-toc">
+                  <details 
+                    className="paper-panel-subtle" 
+                    style={{ padding: '10px 14px', borderRadius: '4px', marginBottom: '22px' }}
+                  >
+                    <summary style={{ 
+                      cursor: 'pointer', 
+                      fontFamily: 'var(--font-mono)', 
+                      fontSize: '0.78rem', 
+                      color: 'var(--text-secondary)', 
+                      userSelect: 'none' 
+                    }}>
+                      ON THIS PAGE ({tocHeadings.length} sections)
+                    </summary>
+                    <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {tocHeadings.map((heading) => (
+                        <a
+                          key={heading.id}
+                          href={`#${heading.id}`}
+                          onClick={(e) => handleScrollToHeading(e, heading.id)}
+                          style={{
+                            fontSize: '0.825rem',
+                            color: 'var(--text-secondary)',
+                            textDecoration: 'none',
+                            lineHeight: 1.4,
+                            paddingLeft: heading.level === 3 ? '10px' : '0px'
+                          }}
+                        >
+                          {heading.text}
+                        </a>
+                      ))}
+                    </div>
+                  </details>
+                </div>
+              )}
 
               {/* Summary lead */}
               {currentDoc.summary && (
@@ -448,7 +571,7 @@ export function DocsPage({ docs }) {
               }}>
                 {prevDoc ? (
                   <button
-                    onClick={() => handleSelectDoc(prevDoc.id)}
+                    onClick={() => handleSelectDoc(prevDoc)}
                     className="paper-btn"
                     style={{ textAlign: 'left', alignItems: 'flex-start', flexDirection: 'column', gap: '2px', padding: '10px 14px' }}
                   >
@@ -459,7 +582,7 @@ export function DocsPage({ docs }) {
 
                 {nextDoc && (
                   <button
-                    onClick={() => handleSelectDoc(nextDoc.id)}
+                    onClick={() => handleSelectDoc(nextDoc)}
                     className="paper-btn paper-btn-primary"
                     style={{ textAlign: 'right', alignItems: 'flex-end', flexDirection: 'column', gap: '2px', padding: '10px 14px' }}
                   >
@@ -485,7 +608,8 @@ export function DocsPage({ docs }) {
         </main>
 
         {/* Right Sidebar: On This Page (TOC) */}
-        <aside className="paper-panel docs-toc docs-toc-col" style={{ padding: '16px' }}>
+        {!focusMode && (
+          <aside className="paper-panel docs-toc docs-toc-col" style={{ padding: '16px' }}>
           <div className="mono-stamp" style={{ color: 'var(--text-tertiary)', marginBottom: '12px' }}>
             ON THIS PAGE
           </div>
@@ -519,6 +643,7 @@ export function DocsPage({ docs }) {
             </div>
           )}
         </aside>
+        )}
       </div>
     </div>
   );

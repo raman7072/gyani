@@ -3,12 +3,23 @@ import {
   X, 
   ExternalLink, 
   ArrowUpRight,
-  GitBranch
+  GitBranch,
+  Share2,
+  Check
 } from 'lucide-react';
+import { copyShareLink } from '../utils/share';
 import { GithubIcon } from './GithubIcon';
 
 export function ProjectDetailsModal({ project, onClose }) {
+  const [copied, setCopied] = React.useState(false);
+
   if (!project) return null;
+
+  const handleShare = async () => {
+    await copyShareLink('project', project.id, project.title);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -61,7 +72,15 @@ export function ProjectDetailsModal({ project, onClose }) {
             <span>Open Source Project Specification</span>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleShare}
+              className="paper-btn paper-btn-sm"
+              title="Copy direct share link to this project"
+            >
+              {copied ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
+              <span>{copied ? 'Link Copied!' : 'Share'}</span>
+            </button>
             {project.repo_url && (
               <a
                 href={project.repo_url}

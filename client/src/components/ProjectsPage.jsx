@@ -6,12 +6,23 @@ import {
   Grid, 
   List, 
   ArrowUpRight,
-  Info
+  Info,
+  Share2,
+  Check
 } from 'lucide-react';
+import { copyShareLink } from '../utils/share';
 import { GithubIcon } from './GithubIcon';
 
 export function ProjectsPage({ projects, onOpenProjectModal }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [copiedId, setCopiedId] = useState('');
+
+  const handleShareProject = async (e, project) => {
+    e.stopPropagation();
+    await copyShareLink('project', project.id, project.title);
+    setCopiedId(project.id);
+    setTimeout(() => setCopiedId(''), 2200);
+  };
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'directory'
@@ -238,6 +249,15 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                     <span>Notes</span>
                   </button>
 
+                  <button
+                    onClick={(e) => handleShareProject(e, project)}
+                    className="paper-btn paper-btn-sm"
+                    title="Copy direct share link to this project"
+                  >
+                    {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
+                    <span>{copiedId === project.id ? 'Copied' : 'Share'}</span>
+                  </button>
+
                   {/* Direct GitHub Link */}
                   {project.repo_url && (
                     <a
@@ -328,6 +348,14 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                         title="View Architecture Notes"
                       >
                         <Info size={13} />
+                      </button>
+                      <button
+                        onClick={(e) => handleShareProject(e, project)}
+                        className="paper-btn paper-btn-sm"
+                        style={{ padding: '5px 8px' }}
+                        title="Share project link"
+                      >
+                        {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
                       </button>
                       {project.repo_url && (
                         <a

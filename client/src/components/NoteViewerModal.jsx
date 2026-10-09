@@ -8,13 +8,23 @@ import {
   Clock,
   ExternalLink,
   BookOpen,
-  Code
+  Code,
+  Share2,
+  Check
 } from 'lucide-react';
+import { copyShareLink } from '../utils/share';
 
 export function NoteViewerModal({ note, onClose, onDownload }) {
   const [viewMode, setViewMode] = useState('formatted'); // 'formatted' | 'raw' | 'pdf'
+  const [copied, setCopied] = useState(false);
 
   if (!note) return null;
+
+  const handleShare = async () => {
+    await copyShareLink('note', note.id, note.title);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  };
 
   // Calculate word count & reading time
   const rawText = (note.preview_content || note.description || '')
@@ -93,7 +103,15 @@ export function NoteViewerModal({ note, onClose, onDownload }) {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            <button
+              onClick={handleShare}
+              className="paper-btn paper-btn-sm"
+              title="Copy direct share link to this note"
+            >
+              {copied ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
+              <span>{copied ? 'Link Copied!' : 'Share'}</span>
+            </button>
             {note.file_url && (
               <a
                 href={note.file_url}
