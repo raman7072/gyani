@@ -641,6 +641,149 @@ textarea.paper-input {
   }
 }
 
+/* ==========================================================================
+   DOCUMENTATION INDEX & CATALOG STYLES
+   ========================================================================== */
+.docs-index-layout {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+}
+
+.docs-stats-ribbon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.docs-stat-card {
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.docs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  gap: 20px;
+}
+
+.docs-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 280px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.docs-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--paper-card-hover);
+  border-color: var(--border-strong);
+}
+
+.docs-card-title {
+  font-family: var(--font-serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+  transition: color 0.15s ease;
+}
+
+.docs-card:hover .docs-card-title {
+  color: var(--text-accent);
+}
+
+.docs-card-summary {
+  font-size: 0.885rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin-bottom: 16px;
+  display: -webkit-box;
+  line-clamp: 3;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.docs-card-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 18px;
+}
+
+.docs-section-pill {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.docs-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+  gap: 10px;
+}
+
+.docs-directory-table-wrapper {
+  overflow-x: auto;
+  border-radius: 6px;
+}
+
+.docs-directory-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+}
+
+.docs-directory-table th {
+  padding: 10px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  color: var(--text-primary);
+}
+
+.docs-directory-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.docs-directory-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.docs-directory-row:hover {
+  background-color: var(--bg-secondary);
+}
+
 /* Printed Manual Style Code Blocks */
 .code-block-wrapper {
   margin: 24px 0;

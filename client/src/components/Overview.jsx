@@ -134,7 +134,12 @@ export function Overview({
         </div>
 
         {/* Documentation Metric */}
-        <div className="paper-panel-subtle dashboard-metric-card">
+        <div 
+          className="paper-panel-subtle dashboard-metric-card"
+          onClick={() => onNavigate('docs')}
+          style={{ cursor: 'pointer' }}
+          title="Browse documentation index"
+        >
           <div>
             <div className="dashboard-metric-header">
               <span className="mono-stamp" style={{ color: 'var(--text-tertiary)' }}>

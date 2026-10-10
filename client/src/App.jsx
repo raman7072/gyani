@@ -119,14 +119,11 @@ function App() {
       return;
     }
 
-    // Direct Documentation link by auto-assigned index (#doc=1, #doc=2, etc.)
-    const docMatch = rawHash.match(/^#\/?docs?(?:[=?/&](?:id=|slug=|index=)?([a-zA-Z0-9_.-]+)|$)/i);
-    if (docMatch) {
+    // Direct Documentation link with document ID (#doc=1, #doc/1, #docs?id=1, etc.)
+    const docParamMatch = rawHash.match(/^#\/?docs?(?:[=?/&](?:id=|slug=|index=)?([a-zA-Z0-9_.-]+))/i);
+    if (docParamMatch && docParamMatch[1]) {
       setActiveTab('docs');
-      const targetId = docMatch[1];
-      if (targetId) {
-        setSelectedDocId(targetId);
-      }
+      setSelectedDocId(docParamMatch[1]);
       return;
     }
 
@@ -136,6 +133,9 @@ function App() {
       setActiveTab(cleanTab);
       setSelectedProject(null);
       setSelectedNote(null);
+      if (cleanTab === 'docs') {
+        setSelectedDocId(null);
+      }
     }
   };
 
@@ -188,6 +188,10 @@ function App() {
         setShortcutsOpen(false);
         setSelectedNote(null);
         setSelectedProject(null);
+        if (selectedDocId) {
+          handleSelectDoc(null);
+          return;
+        }
         handleCloseAdmin();
         return;
       }
@@ -211,10 +215,13 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen, shortcutsOpen, selectedNote, selectedProject, adminOpen, theme]);
+  }, [searchOpen, shortcutsOpen, selectedNote, selectedProject, adminOpen, selectedDocId, theme]);
 
   const handleNavigateTab = (tab) => {
     setActiveTab(tab);
+    if (tab === 'docs') {
+      setSelectedDocId(null);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (tab === 'overview') {
       window.history.pushState(null, '', window.location.pathname + window.location.search);
@@ -244,6 +251,11 @@ function App() {
   };
 
   const handleSelectDoc = (doc) => {
+    if (!doc) {
+      setSelectedDocId(null);
+      window.history.pushState(null, '', '#docs');
+      return;
+    }
     const docIndex = doc.order_index ?? (docs.findIndex(d => d.id === doc.id) + 1);
     setSelectedDocId(String(docIndex));
     window.history.pushState(null, '', `#doc=${docIndex}`);
@@ -291,6 +303,7 @@ function App() {
       setSelectedNote(item);
     } else if (type === 'doc') {
       handleNavigateTab('docs');
+      handleSelectDoc(item);
     }
   };
 
