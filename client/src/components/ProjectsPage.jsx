@@ -13,6 +13,7 @@ import {
 import { copyShareLink } from '../utils/share';
 import { GithubIcon } from './GithubIcon';
 import { getProjectCategories } from '../services/supabase';
+import { useResponsiveViewMode } from '../hooks/useResponsiveViewMode';
 
 export function ProjectsPage({ projects, onOpenProjectModal }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -26,7 +27,7 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
   };
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
-  const [viewMode, setViewMode] = useState('directory'); // 'directory' (default) or 'grid'
+  const [viewMode, setViewMode] = useResponsiveViewMode('directory');
 
   const categories = useMemo(() => {
     const set = new Set(['All']);

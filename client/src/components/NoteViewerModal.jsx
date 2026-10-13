@@ -13,9 +13,15 @@ import {
   Check
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
+import { marked } from 'marked';
 
 export function NoteViewerModal({ note, onClose, onDownload }) {
-  const [viewMode, setViewMode] = useState('formatted'); // 'formatted' | 'raw' | 'pdf'
+  const isPdf = Boolean(
+    note &&
+    (note.file_type === 'PDF' || (note.file_name && note.file_name.toLowerCase().endsWith('.pdf'))) && 
+    note.file_url
+  );
+  const [viewMode, setViewMode] = useState(() => (isPdf ? 'pdf' : 'formatted'));
   const [copied, setCopied] = useState(false);
 
   if (!note) return null;
@@ -34,7 +40,6 @@ export function NoteViewerModal({ note, onClose, onDownload }) {
   const readTimeMin = Math.max(1, Math.ceil(wordCount / 180));
 
   const isHtml = note.preview_content && (note.preview_content.includes('<p>') || note.preview_content.includes('<div>') || note.preview_content.includes('<h1>') || note.preview_content.includes('<h2>'));
-  const isPdf = note.file_type === 'PDF' && note.file_url;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -165,7 +170,18 @@ export function NoteViewerModal({ note, onClose, onDownload }) {
             </h3>
             
             {/* View Mode Toggle */}
-            <div style={{ display: 'flex', gap: '4px' }}>
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              {isPdf && (
+                <button
+                  type="button"
+                  onClick={() => setViewMode('pdf')}
+                  className={`paper-stamp ${viewMode === 'pdf' ? 'paper-stamp-active' : ''}`}
+                  style={{ cursor: 'pointer', border: 'none' }}
+                >
+                  <FileText size={11} style={{ marginRight: '4px' }} />
+                  <span>PDF Frame</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setViewMode('formatted')}
@@ -184,29 +200,18 @@ export function NoteViewerModal({ note, onClose, onDownload }) {
                 <Code size={11} style={{ marginRight: '4px' }} />
                 <span>Raw Text</span>
               </button>
-              {isPdf && (
-                <button
-                  type="button"
-                  onClick={() => setViewMode('pdf')}
-                  className={`paper-stamp ${viewMode === 'pdf' ? 'paper-stamp-active' : ''}`}
-                  style={{ cursor: 'pointer', border: 'none' }}
-                >
-                  <FileText size={11} style={{ marginRight: '4px' }} />
-                  <span>PDF Frame</span>
-                </button>
-              )}
             </div>
           </div>
 
           {/* Reader Body */}
           {viewMode === 'pdf' && isPdf ? (
-            <div style={{ borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-color)', height: '420px' }}>
+            <div style={{ borderRadius: '4px', overflow: 'hidden', border: '1px solid var(--border-color)', height: 'clamp(380px, 60vh, 540px)', background: 'var(--bg-secondary)' }}>
               <iframe 
                 src={`${note.file_url}#toolbar=0`}
                 title={note.title}
                 width="100%" 
                 height="100%" 
-                style={{ border: 'none' }}
+                style={{ border: 'none', display: 'block' }}
               />
             </div>
           ) : viewMode === 'formatted' ? (
@@ -230,9 +235,10 @@ export function NoteViewerModal({ note, onClose, onDownload }) {
                   dangerouslySetInnerHTML={{ __html: note.preview_content }} 
                 />
               ) : note.preview_content ? (
-                <div style={{ whiteSpace: 'pre-wrap' }}>
-                  {note.preview_content}
-                </div>
+                <div 
+                  className="docs-article"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(note.preview_content) }} 
+                />
               ) : (
                 <div style={{ color: 'var(--text-tertiary)', fontStyle: 'italic', textAlign: 'center', padding: '30px 0' }}>
                   No inline preview content extracted for this manuscript. Click "Download File" to view offline.

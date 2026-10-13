@@ -854,6 +854,103 @@ textarea.paper-input {
   line-height: 1.5;
 }
 
+/* Document Article Markdown Typography & Mermaid */
+.docs-article strong,
+.docs-article b {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.docs-article em,
+.docs-article i {
+  font-style: italic;
+}
+
+.docs-article code:not(pre code) {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  word-break: break-word;
+}
+
+.docs-article a {
+  color: var(--accent-stamp-red, var(--text-primary));
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: opacity 0.15s ease;
+}
+
+.docs-article a:hover {
+  opacity: 0.8;
+}
+
+.docs-article del,
+.docs-article s {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.docs-article blockquote {
+  margin: 22px 0;
+  padding: 14px 20px;
+  border-left: 3px solid var(--border-strong);
+  background: var(--bg-secondary);
+  border-radius: 0 4px 4px 0;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.98rem;
+  line-height: 1.65;
+  color: var(--text-primary);
+}
+
+.docs-article ul,
+.docs-article ol {
+  margin: 14px 0 18px 24px;
+  line-height: 1.75;
+  color: var(--text-secondary);
+}
+
+.docs-article li {
+  margin-bottom: 6px;
+}
+
+.docs-article input[type="checkbox"] {
+  accent-color: var(--accent-stamp-red, #9c3b28);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* Mermaid Graphs, Workflows, Trees */
+.mermaid-container {
+  margin: 26px 0;
+  padding: 24px 20px;
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  box-shadow: 2px 2px 0px rgba(0, 0, 0, 0.08);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mermaid-container svg {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 0 auto;
+}
+
+.mermaid-error-card {
+  margin: 20px 0;
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-secondary);
+}
+
 /* ==========================================================================
    MODAL / POPUP (Paper Envelope Style)
    ========================================================================== */

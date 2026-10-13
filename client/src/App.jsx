@@ -546,11 +546,14 @@ function App() {
       </footer>
 
       {/* Modals */}
-      <NoteViewerModal
-        note={selectedNote}
-        onClose={handleCloseNote}
-        onDownload={handleDownloadNote}
-      />
+      {selectedNote && (
+        <NoteViewerModal
+          key={selectedNote.id}
+          note={selectedNote}
+          onClose={handleCloseNote}
+          onDownload={handleDownloadNote}
+        />
+      )}
 
       <ProjectDetailsModal
         project={selectedProject}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useId } from 'react';
 import { 
   BookOpen, 
   Search, 
@@ -21,14 +21,374 @@ import {
   Compass
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
+import { useResponsiveViewMode } from '../hooks/useResponsiveViewMode';
+import { marked } from 'marked';
+import mermaid from 'mermaid';
+
+// Configure marked options for GitHub Flavored Markdown
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
+
+// Clean excerpt for cards and directory tables
+function getDocExcerpt(doc) {
+  if (!doc) return '';
+  if (doc.summary) return doc.summary;
+  if (!doc.content) return 'Technical specification and documentation record.';
+  const clean = doc.content
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/#+\s+.*/g, '')
+    .replace(/>\s+\[!.*?\]/g, '')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_`]/g, '')
+    .trim();
+  return clean.slice(0, 160) + (clean.length > 160 ? '...' : '');
+}
+
+// Extract outline section headings from doc markdown
+function extractDocHeadings(content) {
+  if (!content) return [];
+  const lines = content.split('\n');
+  const sections = [];
+  for (const line of lines) {
+    if (line.startsWith('## ')) {
+      const clean = line.replace('## ', '').replace(/[*_`#]/g, '').trim();
+      sections.push(clean);
+      if (sections.length >= 3) break;
+    }
+  }
+  return sections;
+}
+
+// Dedicated code block with isolated copy state
+function CodeBlock({ code, language }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="code-block-wrapper">
+      <div className="code-header">
+        <span className="mono-stamp">{language || 'CODE'}</span>
+        <button
+          onClick={handleCopy}
+          type="button"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+            background: 'transparent',
+            border: 'none',
+            color: copied ? 'var(--accent-sage)' : 'var(--text-tertiary)',
+            cursor: 'pointer',
+            fontSize: '0.75rem',
+            fontFamily: 'var(--font-mono)'
+          }}
+        >
+          {copied ? <Check size={12} /> : <Copy size={12} />}
+          <span>{copied ? 'Copied' : 'Copy'}</span>
+        </button>
+      </div>
+      <pre className="code-pre">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
+// Mermaid diagram component supporting graphs, workflows, trees, and sequence diagrams
+function MermaidDiagram({ chart }) {
+  const [svgHtml, setSvgHtml] = useState('');
+  const [hasError, setHasError] = useState(false);
+  const reactId = useId();
+  const chartId = useMemo(() => `mermaid-${reactId.replace(/[^a-zA-Z0-9]/g, '')}`, [reactId]);
+
+  useEffect(() => {
+    let active = true;
+    const isDark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
+
+    try {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'loose',
+        theme: isDark ? 'dark' : 'neutral',
+        fontFamily: 'var(--font-mono, monospace)',
+        themeVariables: isDark ? {
+          darkMode: true,
+          background: '#161618',
+          primaryColor: '#27272a',
+          primaryTextColor: '#f4f4f5',
+          primaryBorderColor: '#52525b',
+          lineColor: '#a1a1aa'
+        } : {
+          background: '#fcfbf7',
+          primaryColor: '#f4f1ea',
+          primaryTextColor: '#1c1b18',
+          primaryBorderColor: '#c8c2b4',
+          lineColor: '#5a574d'
+        }
+      });
+    } catch {
+      // initialize silently
+    }
+
+    const render = async () => {
+      try {
+        const id = `svg-${chartId}`;
+        const { svg } = await mermaid.render(id, chart.trim());
+        if (active) {
+          setSvgHtml(svg);
+          setHasError(false);
+        }
+      } catch (err) {
+        if (active) {
+          console.warn('Mermaid rendering issue:', err);
+          setHasError(true);
+        }
+        const errorEl = document.getElementById(`d${chartId}`);
+        if (errorEl) errorEl.remove();
+      }
+    };
+
+    render();
+
+    return () => {
+      active = false;
+      const el = document.getElementById(chartId);
+      if (el) el.remove();
+    };
+  }, [chart, chartId]);
+
+  if (hasError) {
+    return (
+      <div className="mermaid-error-card">
+        <div className="mono-stamp" style={{ color: 'var(--accent-stamp-red)', marginBottom: '8px', fontSize: '0.72rem' }}>
+          WORKFLOW / DIAGRAM PREVIEW
+        </div>
+        <pre className="code-pre" style={{ background: 'transparent', padding: 0 }}>
+          <code>{chart}</code>
+        </pre>
+      </div>
+    );
+  }
+
+  if (!svgHtml) {
+    return (
+      <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)', fontStyle: 'italic', fontSize: '0.82rem' }}>
+        Rendering diagram...
+      </div>
+    );
+  }
+
+  return (
+    <div className="mermaid-container">
+      <div 
+        style={{ width: '100%', overflowX: 'auto', display: 'flex', justifyContent: 'center' }}
+        dangerouslySetInnerHTML={{ __html: svgHtml }} 
+      />
+    </div>
+  );
+}
+
+// Full-feature Markdown & Mermaid renderer supporting bold, italic, code, workflows, graphs, trees, and tables
+function renderMarkdown(rawContent) {
+  if (!rawContent) return null;
+
+  let tokens = [];
+  try {
+    tokens = marked.lexer(rawContent);
+  } catch (err) {
+    console.error('Markdown parse error:', err);
+    return <p style={{ whiteSpace: 'pre-wrap' }}>{rawContent}</p>;
+  }
+
+  const elements = [];
+  let headingCounter = 0;
+
+  tokens.forEach((token, index) => {
+    switch (token.type) {
+      case 'heading': {
+        const id = (token.depth === 2 || token.depth === 3) ? `section-${headingCounter++}` : undefined;
+        const html = marked.parseInline(token.text);
+        if (token.depth === 1) {
+          elements.push(
+            <h1 key={index} id={id} style={{ fontSize: '1.9rem', margin: '36px 0 16px', lineHeight: 1.25 }}>
+              <span dangerouslySetInnerHTML={{ __html: html }} />
+            </h1>
+          );
+        } else if (token.depth === 2) {
+          elements.push(
+            <h2 key={index} id={id} style={{ fontSize: '1.45rem', margin: '36px 0 14px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px', lineHeight: 1.3 }}>
+              <span dangerouslySetInnerHTML={{ __html: html }} />
+            </h2>
+          );
+        } else if (token.depth === 3) {
+          elements.push(
+            <h3 key={index} id={id} style={{ fontSize: '1.18rem', margin: '24px 0 10px', lineHeight: 1.35 }}>
+              <span dangerouslySetInnerHTML={{ __html: html }} />
+            </h3>
+          );
+        } else if (token.depth === 4) {
+          elements.push(
+            <h4 key={index} id={id} style={{ fontSize: '1.05rem', margin: '20px 0 8px', fontWeight: 600 }}>
+              <span dangerouslySetInnerHTML={{ __html: html }} />
+            </h4>
+          );
+        } else {
+          elements.push(
+            <h5 key={index} id={id} style={{ fontSize: '0.95rem', margin: '16px 0 6px', fontWeight: 600 }}>
+              <span dangerouslySetInnerHTML={{ __html: html }} />
+            </h5>
+          );
+        }
+        break;
+      }
+
+      case 'code': {
+        const lang = (token.lang || '').toLowerCase().trim();
+        if (lang === 'mermaid') {
+          elements.push(<MermaidDiagram key={index} chart={token.text} />);
+        } else {
+          elements.push(<CodeBlock key={index} code={token.text} language={token.lang} />);
+        }
+        break;
+      }
+
+      case 'paragraph': {
+        const html = marked.parseInline(token.text);
+        elements.push(
+          <p 
+            key={index} 
+            className="docs-paragraph"
+            style={{ fontSize: '0.98rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: '16px' }}
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        );
+        break;
+      }
+
+      case 'list': {
+        elements.push(
+          <div 
+            key={index} 
+            className="docs-list-block"
+            dangerouslySetInnerHTML={{ __html: marked.parse(token.raw) }} 
+          />
+        );
+        break;
+      }
+
+      case 'table': {
+        elements.push(
+          <div key={index} className="paper-table-wrapper" style={{ margin: '22px 0' }}>
+            <table className="paper-table">
+              <thead>
+                <tr>
+                  {token.header.map((col, colIdx) => (
+                    <th key={colIdx} style={{ textAlign: token.align && token.align[colIdx] ? token.align[colIdx] : 'left' }}>
+                      <span dangerouslySetInnerHTML={{ __html: marked.parseInline(col.text) }} />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {token.rows.map((row, rowIdx) => (
+                  <tr key={rowIdx}>
+                    {row.map((cell, cellIdx) => (
+                      <td key={cellIdx} style={{ textAlign: token.align && token.align[cellIdx] ? token.align[cellIdx] : 'left' }}>
+                        <span dangerouslySetInnerHTML={{ __html: marked.parseInline(cell.text) }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        break;
+      }
+
+      case 'blockquote': {
+        const rawText = token.text || '';
+        if (rawText.startsWith('[!TIP]')) {
+          const body = rawText.replace('[!TIP]', '').trim();
+          elements.push(
+            <div key={index} className="callout" style={{ borderLeftColor: 'var(--accent-sage)' }}>
+              <Lightbulb size={18} color="var(--accent-sage)" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div className="callout-title" style={{ color: 'var(--accent-sage)' }}>Marginal Note: Tip</div>
+                <div className="callout-body" dangerouslySetInnerHTML={{ __html: marked.parseInline(body || 'Practical implementation advice for system engineers.') }} />
+              </div>
+            </div>
+          );
+        } else if (rawText.startsWith('[!NOTE]') || rawText.startsWith('[!IMPORTANT]')) {
+          const body = rawText.replace(/\[!(NOTE|IMPORTANT)\]/, '').trim();
+          elements.push(
+            <div key={index} className="callout" style={{ borderLeftColor: 'var(--text-primary)' }}>
+              <Info size={18} color="var(--text-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
+              <div>
+                <div className="callout-title">Marginal Note</div>
+                <div className="callout-body" dangerouslySetInnerHTML={{ __html: marked.parseInline(body || 'Key architectural context and trade-offs.') }} />
+              </div>
+            </div>
+          );
+        } else {
+          elements.push(
+            <div 
+              key={index} 
+              className="docs-blockquote-container"
+              dangerouslySetInnerHTML={{ __html: marked.parse(token.raw) }} 
+            />
+          );
+        }
+        break;
+      }
+
+      case 'html': {
+        elements.push(
+          <div key={index} dangerouslySetInnerHTML={{ __html: token.text }} />
+        );
+        break;
+      }
+
+      case 'text': {
+        elements.push(
+          <p 
+            key={index} 
+            className="docs-paragraph"
+            style={{ fontSize: '0.98rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: '16px' }}
+            dangerouslySetInnerHTML={{ __html: marked.parseInline(token.text) }}
+          />
+        );
+        break;
+      }
+
+      case 'hr': {
+        elements.push(
+          <hr key={index} style={{ margin: '30px 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />
+        );
+        break;
+      }
+
+      default:
+        break;
+    }
+  });
+
+  return elements;
+}
 
 export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
   const [internalDocId, setInternalDocId] = useState(controlledDocId || null);
   const [searchTopic, setSearchTopic] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('index'); // 'index' | 'readingTime' | 'title'
-  const [viewMode, setViewMode] = useState('directory'); // 'directory' (default) | 'grid'
-  const [copiedSnippet, setCopiedSnippet] = useState('');
+  const [viewMode, setViewMode] = useResponsiveViewMode('directory');
   const [copiedShare, setCopiedShare] = useState(false);
   const [copiedCardId, setCopiedCardId] = useState(null);
   const [scrollProgress, setScrollProgress] = useState(0);
@@ -37,20 +397,48 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
 
   const activeDocId = controlledDocId !== undefined ? controlledDocId : internalDocId;
 
+  // Resolve current active doc. If no doc is specified or selected, currentDoc is null (showing Index page)
+  const currentDoc = useMemo(() => {
+    if (!docs.length || !activeDocId) return null;
 
+    // 1. Try matching by numerical order_index (auto-assigned index like #doc=1, #doc=2)
+    const num = parseInt(activeDocId, 10);
+    if (!isNaN(num)) {
+      const byOrder = docs.find(d => Number(d.order_index) === num);
+      if (byOrder) return byOrder;
+      // Fallback: 1-based document position
+      if (num >= 1 && num <= docs.length) {
+        return docs[num - 1];
+      }
+    }
+
+    // 2. Fallback: match by UUID id or string slug for compatibility
+    const bySlugOrId = docs.find(d => String(d.id) === String(activeDocId) || d.slug === activeDocId);
+    if (bySlugOrId) return bySlugOrId;
+
+    return null;
+  }, [docs, activeDocId]);
 
   // Track reading progress on scroll when inside an article
   useEffect(() => {
+    if (!currentDoc) return;
+    let ticking = false;
     const handleScroll = () => {
-      const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
-      if (totalHeight > 0) {
-        const progress = Math.min(100, Math.max(0, (window.scrollY / totalHeight) * 100));
-        setScrollProgress(progress);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const totalHeight = document.documentElement.scrollHeight - window.innerHeight;
+          if (totalHeight > 0) {
+            const progress = Math.min(100, Math.max(0, (window.scrollY / totalHeight) * 100));
+            setScrollProgress(progress);
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [currentDoc]);
 
   const handleSelectDoc = (doc) => {
     if (!doc) {
@@ -94,28 +482,6 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
     }
   };
 
-  // Resolve current active doc. If no doc is specified or selected, currentDoc is null (showing Index page)
-  const currentDoc = useMemo(() => {
-    if (!docs.length || !activeDocId) return null;
-
-    // 1. Try matching by numerical order_index (auto-assigned index like #doc=1, #doc=2)
-    const num = parseInt(activeDocId, 10);
-    if (!isNaN(num)) {
-      const byOrder = docs.find(d => Number(d.order_index) === num);
-      if (byOrder) return byOrder;
-      // Fallback: 1-based document position
-      if (num >= 1 && num <= docs.length) {
-        return docs[num - 1];
-      }
-    }
-
-    // 2. Fallback: match by UUID id or string slug for compatibility
-    const bySlugOrId = docs.find(d => String(d.id) === String(activeDocId) || d.slug === activeDocId);
-    if (bySlugOrId) return bySlugOrId;
-
-    return null;
-  }, [docs, activeDocId]);
-
   // Categories list
   const categories = useMemo(() => {
     const set = new Set(['All']);
@@ -131,34 +497,6 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
   }, [docs]);
 
   const totalReadingMinutes = Math.max(1, Math.round(totalCorpusWords / 180));
-
-  // Extract outline section headings from doc markdown
-  const extractDocHeadings = (content) => {
-    if (!content) return [];
-    const lines = content.split('\n');
-    const sections = [];
-    for (const line of lines) {
-      if (line.startsWith('## ')) {
-        sections.push(line.replace('## ', '').trim());
-        if (sections.length >= 3) break;
-      }
-    }
-    return sections;
-  };
-
-  // Clean excerpt for cards
-  const getDocExcerpt = (doc) => {
-    if (doc.summary) return doc.summary;
-    if (!doc.content) return 'Technical specification and documentation record.';
-    const clean = doc.content
-      .replace(/```[\s\S]*?```/g, '')
-      .replace(/#+\s+.*/g, '')
-      .replace(/>\s+\[!.*?\]/g, '')
-      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/[*_`]/g, '')
-      .trim();
-    return clean.slice(0, 160) + (clean.length > 160 ? '...' : '');
-  };
 
   // Filtered & sorted documents for index page
   const filteredDocs = useMemo(() => {
@@ -207,34 +545,39 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
   const prevDoc = currentIndex > 0 ? docs[currentIndex - 1] : null;
   const nextDoc = currentIndex < docs.length - 1 ? docs[currentIndex + 1] : null;
 
-  const handleCopyCode = (code, id) => {
-    navigator.clipboard.writeText(code);
-    setCopiedSnippet(id);
-    setTimeout(() => setCopiedSnippet(''), 2000);
-  };
+  const docContent = currentDoc ? currentDoc.content || '' : '';
 
   const tocHeadings = useMemo(() => {
-    if (!currentDoc?.content) return [];
-    const lines = currentDoc.content.split('\n');
-    const headings = [];
-    lines.forEach((line, index) => {
-      if (line.startsWith('## ')) {
-        const text = line.replace('## ', '').trim();
-        headings.push({ level: 2, text, id: `section-${index}` });
-      } else if (line.startsWith('### ')) {
-        const text = line.replace('### ', '').trim();
-        headings.push({ level: 3, text, id: `section-${index}` });
-      }
-    });
-    return headings;
-  }, [currentDoc?.content]);
+    if (!docContent) return [];
+    try {
+      const tokens = marked.lexer(docContent);
+      const headings = [];
+      let headingIndex = 0;
+      tokens.forEach((token) => {
+        if (token.type === 'heading' && (token.depth === 2 || token.depth === 3)) {
+          headings.push({
+            level: token.depth,
+            text: token.text.replace(/[*_`#]/g, '').trim(),
+            id: `section-${headingIndex++}`
+          });
+        }
+      });
+      return headings;
+    } catch {
+      return [];
+    }
+  }, [docContent]);
 
   const docWordCount = useMemo(() => {
-    if (!currentDoc?.content) return 0;
-    return currentDoc.content.trim().split(/\s+/).filter(Boolean).length;
-  }, [currentDoc?.content]);
+    if (!docContent) return 0;
+    return docContent.trim().split(/\s+/).filter(Boolean).length;
+  }, [docContent]);
 
   const docReadTime = Math.max(1, Math.ceil(docWordCount / 180));
+
+  const renderedContent = useMemo(() => {
+    return renderMarkdown(docContent);
+  }, [docContent]);
 
   const handleScrollToHeading = (e, id) => {
     e.preventDefault();
@@ -242,199 +585,6 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  };
-
-  const renderMarkdown = (rawContent) => {
-    if (!rawContent) return null;
-
-    const lines = rawContent.split('\n');
-    const elements = [];
-    let inCodeBlock = false;
-    let codeLanguage = '';
-    let codeBuffer = [];
-    let inTable = false;
-    let tableBuffer = [];
-
-    const flushCodeBlock = (key) => {
-      const codeText = codeBuffer.join('\n');
-      const snippetId = `snippet-${key}`;
-      elements.push(
-        <div key={snippetId} className="code-block-wrapper">
-          <div className="code-header">
-            <span className="mono-stamp">{codeLanguage || 'CODE'}</span>
-            <button
-              onClick={() => handleCopyCode(codeText, snippetId)}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px',
-                background: 'transparent',
-                border: 'none',
-                color: copiedSnippet === snippetId ? 'var(--accent-sage)' : 'var(--text-tertiary)',
-                cursor: 'pointer',
-                fontSize: '0.75rem',
-                fontFamily: 'var(--font-mono)'
-              }}
-            >
-              {copiedSnippet === snippetId ? <Check size={12} /> : <Copy size={12} />}
-              <span>{copiedSnippet === snippetId ? 'Copied' : 'Copy'}</span>
-            </button>
-          </div>
-          <pre className="code-pre">
-            <code>{codeText}</code>
-          </pre>
-        </div>
-      );
-      codeBuffer = [];
-      codeLanguage = '';
-      inCodeBlock = false;
-    };
-
-    const flushTable = (key) => {
-      if (tableBuffer.length === 0) return;
-      const headerRow = tableBuffer[0].split('|').filter(c => c.trim() !== '');
-      const bodyRows = tableBuffer.slice(2).map(r => r.split('|').filter(c => c.trim() !== ''));
-
-      elements.push(
-        <div key={`table-${key}`} style={{ overflowX: 'auto', margin: '20px 0' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--border-strong)', background: 'var(--bg-secondary)' }}>
-                {headerRow.map((h, i) => (
-                  <th key={i} style={{ padding: '8px 12px', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.78rem', textTransform: 'uppercase' }}>
-                    {h.trim()}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {bodyRows.map((row, rIdx) => (
-                <tr key={rIdx} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  {row.map((cell, cIdx) => (
-                    <td key={cIdx} style={{ padding: '8px 12px', color: 'var(--text-secondary)' }}>
-                      {cell.trim()}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
-      tableBuffer = [];
-      inTable = false;
-    };
-
-    lines.forEach((line, index) => {
-      if (line.startsWith('```')) {
-        if (inCodeBlock) {
-          flushCodeBlock(index);
-        } else {
-          inCodeBlock = true;
-          codeLanguage = line.replace('```', '').trim();
-        }
-        return;
-      }
-
-      if (inCodeBlock) {
-        codeBuffer.push(line);
-        return;
-      }
-
-      if (line.startsWith('|') && line.endsWith('|')) {
-        inTable = true;
-        tableBuffer.push(line);
-        return;
-      } else if (inTable) {
-        flushTable(index);
-      }
-
-      if (line.startsWith('> [!TIP]')) {
-        elements.push(
-          <div key={index} className="callout" style={{ borderLeftColor: 'var(--accent-sage)' }}>
-            <Lightbulb size={17} color="var(--accent-sage)" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <div className="callout-title" style={{ color: 'var(--accent-sage)' }}>Marginal Note: Tip</div>
-              <div className="callout-body">Practical implementation advice for system engineers.</div>
-            </div>
-          </div>
-        );
-        return;
-      }
-      if (line.startsWith('> [!NOTE]') || line.startsWith('> [!IMPORTANT]')) {
-        elements.push(
-          <div key={index} className="callout" style={{ borderLeftColor: 'var(--text-primary)' }}>
-            <Info size={17} color="var(--text-primary)" style={{ flexShrink: 0, marginTop: '2px' }} />
-            <div>
-              <div className="callout-title">Marginal Note</div>
-              <div className="callout-body">Key architectural context and trade-offs.</div>
-            </div>
-          </div>
-        );
-        return;
-      }
-
-      if (line.startsWith('# ')) {
-        return;
-      }
-      if (line.startsWith('## ')) {
-        const text = line.replace('## ', '');
-        elements.push(
-          <h2 key={index} id={`section-${index}`} style={{ fontSize: '1.45rem', margin: '36px 0 14px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
-            {text}
-          </h2>
-        );
-        return;
-      }
-      if (line.startsWith('### ')) {
-        const text = line.replace('### ', '');
-        elements.push(
-          <h3 key={index} id={`section-${index}`} style={{ fontSize: '1.18rem', margin: '22px 0 10px' }}>
-            {text}
-          </h3>
-        );
-        return;
-      }
-
-      if (line.startsWith('- ') || line.startsWith('* ')) {
-        const text = line.substring(2);
-        elements.push(
-          <li key={index} style={{ marginLeft: '22px', marginBottom: '6px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-            {text}
-          </li>
-        );
-        return;
-      }
-
-      if (/^\d+\.\s/.test(line)) {
-        const text = line.replace(/^\d+\.\s/, '');
-        elements.push(
-          <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '6px', color: 'var(--text-secondary)', lineHeight: 1.65 }}>
-            <span style={{ fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>•</span>
-            <span>{text}</span>
-          </div>
-        );
-        return;
-      }
-
-      if (line.startsWith('---')) {
-        elements.push(<hr key={index} style={{ margin: '28px 0', border: 'none', borderTop: '1px solid var(--border-color)' }} />);
-        return;
-      }
-
-      if (line.trim().length > 0) {
-        elements.push(
-          <p key={index} style={{ fontSize: '0.98rem', color: 'var(--text-secondary)', lineHeight: 1.75, marginBottom: '16px' }}>
-            {line}
-          </p>
-        );
-      }
-    });
-
-    if (inCodeBlock) flushCodeBlock('end');
-    if (inTable) flushTable('end');
-
-    return elements;
   };
 
   // =========================================================================
@@ -755,6 +905,7 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
                   const words = doc.content ? doc.content.trim().split(/\s+/).filter(Boolean).length : 0;
                   const readTime = Math.max(1, Math.ceil(words / 180));
                   const sections = extractDocHeadings(doc.content);
+                  const excerpt = getDocExcerpt(doc);
                   const isCopied = copiedCardId === doc.id;
 
                   return (
@@ -771,7 +922,7 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
                           {doc.title}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', maxWidth: '480px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {getDocExcerpt(doc)}
+                          {excerpt}
                         </div>
                       </td>
                       <td>
@@ -924,16 +1075,6 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
         {/* Left Sidebar: Categories & Article Directory */}
         {!sidebarCollapsed && !focusMode && (
           <aside className="paper-panel docs-sidebar">
-            {/* Direct Return to Index Button in Sidebar */}
-            <button
-              onClick={handleBackToIndex}
-              className="paper-btn paper-btn-sm"
-              style={{ width: '100%', marginBottom: '12px', justifyContent: 'center', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}
-            >
-              <ArrowLeft size={13} />
-              <span>← All Documentation</span>
-            </button>
-
             {/* Quick Filter */}
             <div style={{ position: 'relative', marginBottom: '16px' }}>
               <Search size={14} color="var(--text-tertiary)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
@@ -1004,30 +1145,18 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
             </h1>
 
             {/* Meta info bar */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', fontSize: '0.78rem', color: 'var(--text-tertiary)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', marginBottom: '22px', fontFamily: 'var(--font-mono)' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Clock size={12} />
-                  <span>~{docReadTime} MIN READ ({docWordCount.toLocaleString()} WORDS)</span>
-                </span>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Calendar size={12} />
-                  <span>UPDATED RECENTLY</span>
-                </span>
-                <span>
-                  INDEX: #{currentDoc.order_index ?? (currentIndex + 1)}
-                </span>
-              </div>
-
-              <button
-                onClick={(e) => handleShareDoc(e)}
-                className="paper-btn paper-btn-sm"
-                title="Copy shareable link to this document"
-                style={{ padding: '3px 9px', fontSize: '0.74rem' }}
-              >
-                {copiedShare ? <Check size={12} color="var(--accent-sage)" /> : <Share2 size={12} />}
-                <span>{copiedShare ? 'Link Copied!' : 'Share Doc'}</span>
-              </button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '14px', fontSize: '0.78rem', color: 'var(--text-tertiary)', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)', marginBottom: '22px', fontFamily: 'var(--font-mono)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Clock size={12} />
+                <span>~{docReadTime} MIN READ ({docWordCount.toLocaleString()} WORDS)</span>
+              </span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                <Calendar size={12} />
+                <span>UPDATED RECENTLY</span>
+              </span>
+              <span>
+                INDEX: #{currentDoc.order_index ?? (currentIndex + 1)}
+              </span>
             </div>
 
             {/* In-content Table of Contents for Tablet/Mobile where right sidebar is hidden */}
@@ -1087,8 +1216,8 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
             )}
 
             {/* Render Document Content */}
-            <div>
-              {renderMarkdown(currentDoc.content)}
+            <div className="docs-article">
+              {renderedContent}
             </div>
 
             {/* Bottom Pagination & Back to Index */}

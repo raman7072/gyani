@@ -11,6 +11,7 @@ import {
   Grid
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
+import { useResponsiveViewMode } from '../hooks/useResponsiveViewMode';
 
 export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -24,7 +25,7 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
   };
   const [selectedFormat, setSelectedFormat] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [viewMode, setViewMode] = useState('directory'); // 'directory' (default) or 'grid'
+  const [viewMode, setViewMode] = useResponsiveViewMode('directory');
 
   const formats = ['All', 'PDF', 'DOCX', 'MARKDOWN'];
 
