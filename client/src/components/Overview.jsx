@@ -26,7 +26,7 @@ export function Overview({
   // 1. Projects Statistics & Metrics
   const totalProjects = projects.length;
   const completedProjects = projects.filter(p => p.status === 'Completed').length;
-  const inProgressProjects = projects.filter(p => p.status === 'In Progress' || p.status === 'Active').length;
+  const inProgressProjects = projects.filter(p => p.status === 'In Progress' || p.status === 'Active' || p.status === 'βeta' || p.status === 'βeta testing' || p.status === 'Beta Testing' || p.status === 'Beta').length;
   const plannedProjects = Math.max(0, totalProjects - completedProjects - inProgressProjects);
   const completionPercentage = totalProjects > 0 ? Math.round((completedProjects / totalProjects) * 100) : 0;
 
@@ -125,7 +125,7 @@ export function Overview({
           </div>
           <div className="dashboard-metric-sub">
             <span>
-              <strong style={{ color: 'var(--text-primary)' }}>{completedProjects}</strong> done • {inProgressProjects} active
+              <strong style={{ color: 'var(--text-primary)' }}>{completedProjects}</strong> done • {inProgressProjects} βeta
             </span>
             <span className="paper-stamp paper-stamp-sage" style={{ fontSize: '0.65rem', padding: '1px 5px' }}>
               {completionPercentage}%
@@ -529,7 +529,7 @@ export function Overview({
                         </span>
                       ))}
                       <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                        {project.status}
+                        {(project.status === 'Active' || project.status === 'Beta Testing' || project.status === 'βeta testing' || project.status === 'Beta') ? 'βeta' : project.status}
                       </span>
                     </div>
                   </div>

@@ -26,7 +26,7 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
   };
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'directory'
+  const [viewMode, setViewMode] = useState('directory'); // 'directory' (default) or 'grid'
 
   const categories = useMemo(() => {
     const set = new Set(['All']);
@@ -36,7 +36,7 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
     return Array.from(set);
   }, [projects]);
 
-  const statuses = ['All', 'Completed', 'Active', 'In Progress', 'Planned'];
+  const statuses = ['All', 'Completed', 'βeta', 'In Progress', 'Planned'];
 
   const filteredProjects = useMemo(() => {
     return projects.filter(project => {
@@ -48,7 +48,10 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
         cats.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesCategory = selectedCategory === 'All' || cats.includes(selectedCategory);
-      const matchesStatus = selectedStatus === 'All' || project.status === selectedStatus;
+      const matchesStatus = selectedStatus === 'All' || 
+        (selectedStatus === 'βeta' || selectedStatus === 'βeta testing' || selectedStatus === 'Beta Testing' || selectedStatus === 'Beta'
+          ? (project.status === 'βeta' || project.status === 'βeta testing' || project.status === 'Beta Testing' || project.status === 'Beta' || project.status === 'Active') 
+          : project.status === selectedStatus);
 
       return matchesSearch && matchesCategory && matchesStatus;
     });
@@ -181,7 +184,7 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                   </div>
 
                   <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`}>
-                    {project.status}
+                    {(project.status === 'Active' || project.status === 'Beta Testing' || project.status === 'βeta testing' || project.status === 'Beta') ? 'βeta' : project.status}
                   </span>
                 </div>
 
@@ -234,60 +237,91 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                   </div>
                 )}
 
+                {/* 4 Card Action Buttons properly aligned with zero overflow */}
                 <div style={{ 
-                  display: 'flex', 
-                  alignItems: 'center', 
-                  justifyContent: 'space-between',
+                  display: 'grid', 
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '7px',
                   paddingTop: '14px',
                   borderTop: '1px solid var(--border-color)',
-                  gap: '8px'
+                  width: '100%',
+                  boxSizing: 'border-box'
                 }}>
+                  {/* 1. Architecture Notes */}
                   <button
                     onClick={() => onOpenProjectModal(project)}
                     className="paper-btn paper-btn-sm"
-                    style={{ flex: 1 }}
+                    style={{ width: '100%', justifyContent: 'center', padding: '6px 8px', fontSize: '0.78rem' }}
                     title="Read architecture overview & design notes"
                   >
                     <Info size={13} />
                     <span>Notes</span>
                   </button>
 
-                  <button
-                    onClick={(e) => handleShareProject(e, project)}
-                    className="paper-btn paper-btn-sm"
-                    title="Copy direct share link to this project"
-                  >
-                    {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
-                    <span>{copiedId === project.id ? 'Copied' : 'Share'}</span>
-                  </button>
+                  {/* 2. Open Live Deployment (prominent primary button) */}
+                  {project.demo_url ? (
+                    <a
+                      href={project.demo_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="paper-btn paper-btn-primary paper-btn-sm"
+                      style={{ width: '100%', justifyContent: 'center', padding: '6px 8px', fontSize: '0.78rem' }}
+                      title="Open Live Deployment"
+                    >
+                      <ExternalLink size={13} />
+                      <span>Live Demo</span>
+                    </a>
+                  ) : (
+                    <button
+                      onClick={(e) => handleShareProject(e, project)}
+                      className="paper-btn paper-btn-sm"
+                      style={{ width: '100%', justifyContent: 'center', padding: '6px 8px', fontSize: '0.78rem' }}
+                      title="Copy direct share link to this project"
+                    >
+                      {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
+                      <span>{copiedId === project.id ? 'Copied' : 'Share'}</span>
+                    </button>
+                  )}
 
-                  {/* Direct GitHub Link */}
+                  {/* 3. GitHub Repository Link */}
                   {project.repo_url && (
                     <a
                       href={project.repo_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="paper-btn paper-btn-primary paper-btn-sm"
-                      style={{ flex: 1.3 }}
+                      className="paper-btn paper-btn-sm"
+                      style={{ 
+                        width: '100%', 
+                        justifyContent: 'center', 
+                        padding: '6px 8px', 
+                        fontSize: '0.78rem',
+                        gridColumn: !project.demo_url ? '1 / -1' : undefined
+                      }}
                       title="Inspect GitHub Repository"
                     >
-                      <GithubIcon size={14} />
+                      <GithubIcon size={13} />
                       <span>GitHub</span>
-                      <ArrowUpRight size={12} />
+                      <ArrowUpRight size={11} />
                     </a>
                   )}
 
+                  {/* 4. Share Project (when demo_url is present) */}
                   {project.demo_url && (
-                    <a
-                      href={project.demo_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={(e) => handleShareProject(e, project)}
                       className="paper-btn paper-btn-sm"
-                      style={{ padding: '6px 9px' }}
-                      title="Open Live Deployment"
+                      style={{ 
+                        width: '100%', 
+                        justifyContent: 'center', 
+                        padding: '6px 8px', 
+                        fontSize: '0.78rem',
+                        gridColumn: !project.repo_url ? '1 / -1' : undefined
+                      }}
+                      title="Copy direct share link to this project"
                     >
-                      <ExternalLink size={13} />
-                    </a>
+                      {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
+                      <span>{copiedId === project.id ? 'Copied' : 'Share'}</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -297,33 +331,35 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
       )}
 
       {/* Directory Table View */}
-      {viewMode === 'directory' && (
-        <div className="paper-panel" style={{ overflowX: 'auto', padding: '8px' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+      {viewMode === 'directory' && filteredProjects.length > 0 && (
+        <div className="paper-table-wrapper">
+          <table className="paper-table">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-tertiary)', fontSize: '0.75rem', fontFamily: 'var(--font-mono)', textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 14px' }}>Manuscript / Project</th>
-                <th style={{ padding: '12px 14px' }}>Category</th>
-                <th style={{ padding: '12px 14px' }}>Tech Stack</th>
-                <th style={{ padding: '12px 14px' }}>Status</th>
-                <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actions</th>
+              <tr>
+                <th style={{ width: '36%' }}>Manuscript / Project</th>
+                <th style={{ width: '18%' }}>Category</th>
+                <th style={{ width: '18%' }}>Tech Stack</th>
+                <th style={{ width: '12%' }}>Status</th>
+                <th style={{ width: '16%', textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredProjects.map((project) => (
                 <tr 
                   key={project.id}
-                  style={{ borderBottom: '1px solid var(--border-color)' }}
+                  className="paper-table-row"
                 >
-                  <td style={{ padding: '14px' }}>
+                  <td>
                     <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '2px', fontFamily: 'var(--font-serif)' }}>
                       {project.title}
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '380px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {project.description}
-                    </div>
+                    {project.description && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '380px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {project.description}
+                      </div>
+                    )}
                   </td>
-                  <td style={{ padding: '14px' }}>
+                  <td>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '240px' }}>
                       {getProjectCategories(project).map((cat, idx) => (
                         <span key={idx} className="paper-stamp" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
@@ -332,21 +368,21 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                       ))}
                     </div>
                   </td>
-                  <td style={{ padding: '14px' }}>
+                  <td>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '200px' }}>
                       {project.tags?.slice(0, 3).map(tag => (
-                        <span key={tag} className="mono-stamp" style={{ padding: '1px 5px', borderRadius: '3px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                        <span key={tag} className="mono-stamp" style={{ padding: '1px 5px', borderRadius: '3px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontSize: '0.68rem' }}>
                           {tag}
                         </span>
                       ))}
                     </div>
                   </td>
-                  <td style={{ padding: '14px' }}>
-                    <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`}>
-                      {project.status}
+                  <td>
+                    <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`} style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                      {(project.status === 'Active' || project.status === 'Beta Testing' || project.status === 'βeta testing' || project.status === 'Beta') ? 'βeta' : project.status}
                     </span>
                   </td>
-                  <td style={{ padding: '14px', textAlign: 'right' }}>
+                  <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', gap: '6px' }}>
                       <button
                         onClick={() => onOpenProjectModal(project)}
@@ -369,12 +405,25 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                           href={project.repo_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="paper-btn paper-btn-primary paper-btn-sm"
-                          style={{ padding: '5px 10px' }}
+                          className="paper-btn paper-btn-sm"
+                          style={{ padding: '5px 9px' }}
                           title="Check out GitHub Repository"
                         >
                           <GithubIcon size={13} />
-                          <span>Repo</span>
+                          <span className="hide-on-mobile">Repo</span>
+                        </a>
+                      )}
+                      {project.demo_url && (
+                        <a
+                          href={project.demo_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="paper-btn paper-btn-primary paper-btn-sm"
+                          style={{ padding: '5px 9px' }}
+                          title="Open Live Deployment"
+                        >
+                          <ExternalLink size={13} />
+                          <span className="hide-on-mobile">Live</span>
                         </a>
                       )}
                     </div>

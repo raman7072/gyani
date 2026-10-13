@@ -1466,3 +1466,91 @@ textarea.paper-input {
     font-size: 0.8rem;
   }
 }
+
+/* ==========================================================================
+   UNIVERSAL DIRECTORY TABLE & PC / MOBILE (IOS & ANDROID) OPTIMIZATIONS
+   ========================================================================== */
+.paper-table-wrapper {
+  overflow-x: auto;
+  border-radius: 6px;
+  -webkit-overflow-scrolling: touch;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--paper-inner-highlight), var(--paper-card-shadow);
+  width: 100%;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) transparent;
+}
+
+.paper-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.88rem;
+  min-width: 680px;
+}
+
+.paper-table th {
+  padding: 11px 14px;
+  background: var(--bg-secondary);
+  border-bottom: 2px solid var(--border-strong);
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.paper-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  vertical-align: middle;
+}
+
+.paper-table-row {
+  transition: background-color 0.15s ease;
+}
+
+@media (hover: hover) {
+  .paper-table-row:hover {
+    background-color: var(--bg-secondary);
+  }
+}
+
+.paper-table-row:active {
+  background-color: var(--bg-tertiary);
+}
+
+/* iOS & Android Touch & Responsive Enhancements */
+@media (max-width: 640px) {
+  .paper-table {
+    min-width: 580px;
+  }
+  .paper-table th {
+    padding: 9px 10px;
+    font-size: 0.7rem;
+  }
+  .paper-table td {
+    padding: 11px 10px;
+    font-size: 0.82rem;
+  }
+  .hide-on-mobile {
+    display: none !important;
+  }
+  /* Prevent iOS Safari auto-zoom on input focus */
+  .paper-input {
+    font-size: 16px !important;
+  }
+}
+
+/* Safe Area Insets for iOS devices (iPhone notches / home indicators) */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .main-container {
+    padding-bottom: max(80px, env(safe-area-inset-bottom) + 50px);
+  }
+}
+

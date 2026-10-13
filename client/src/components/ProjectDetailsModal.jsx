@@ -39,7 +39,7 @@ export function ProjectDetailsModal({ project, onClose }) {
                 </span>
               ))}
               <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`}>
-                {project.status}
+                {(project.status === 'Active' || project.status === 'Beta Testing' || project.status === 'βeta testing' || project.status === 'Beta') ? 'βeta' : project.status}
               </span>
             </div>
 

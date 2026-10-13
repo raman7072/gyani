@@ -14,7 +14,7 @@ import {
   Maximize2,
   ArrowLeft,
   Grid,
-  List,
+  Table,
   X,
   FileText,
   Layers,
@@ -27,7 +27,7 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
   const [searchTopic, setSearchTopic] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [sortBy, setSortBy] = useState('index'); // 'index' | 'readingTime' | 'title'
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'directory'
+  const [viewMode, setViewMode] = useState('directory'); // 'directory' (default) | 'grid'
   const [copiedSnippet, setCopiedSnippet] = useState('');
   const [copiedShare, setCopiedShare] = useState(false);
   const [copiedCardId, setCopiedCardId] = useState(null);
@@ -37,9 +37,7 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
 
   const activeDocId = controlledDocId !== undefined ? controlledDocId : internalDocId;
 
-  useEffect(() => {
-    setInternalDocId(controlledDocId || null);
-  }, [controlledDocId]);
+
 
   // Track reading progress on scroll when inside an article
   useEffect(() => {
@@ -229,12 +227,12 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
       }
     });
     return headings;
-  }, [currentDoc]);
+  }, [currentDoc?.content]);
 
   const docWordCount = useMemo(() => {
     if (!currentDoc?.content) return 0;
     return currentDoc.content.trim().split(/\s+/).filter(Boolean).length;
-  }, [currentDoc]);
+  }, [currentDoc?.content]);
 
   const docReadTime = Math.max(1, Math.ceil(docWordCount / 180));
 
@@ -460,6 +458,15 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
             {/* View Mode Toggle */}
             <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-secondary)', padding: '3px', borderRadius: '5px', border: '1px solid var(--border-color)', alignSelf: 'flex-end' }}>
               <button
+                onClick={() => setViewMode('directory')}
+                className={`paper-stamp ${viewMode === 'directory' ? 'paper-stamp-active' : ''}`}
+                style={{ cursor: 'pointer', border: 'none' }}
+                title="Directory Table View"
+              >
+                <Table size={13} />
+                <span>Directory</span>
+              </button>
+              <button
                 onClick={() => setViewMode('grid')}
                 className={`paper-stamp ${viewMode === 'grid' ? 'paper-stamp-active' : ''}`}
                 style={{ cursor: 'pointer', border: 'none' }}
@@ -467,15 +474,6 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
               >
                 <Grid size={13} />
                 <span>Grid</span>
-              </button>
-              <button
-                onClick={() => setViewMode('directory')}
-                className={`paper-stamp ${viewMode === 'directory' ? 'paper-stamp-active' : ''}`}
-                style={{ cursor: 'pointer', border: 'none' }}
-                title="Directory Table View"
-              >
-                <List size={13} />
-                <span>Directory</span>
               </button>
             </div>
           </div>
@@ -739,8 +737,8 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
 
         {/* DIRECTORY TABLE VIEW */}
         {viewMode === 'directory' && (
-          <div className="paper-panel docs-directory-table-wrapper" style={{ padding: '0' }}>
-            <table className="docs-directory-table">
+          <div className="paper-table-wrapper docs-directory-table-wrapper" style={{ padding: '0' }}>
+            <table className="paper-table docs-directory-table">
               <thead>
                 <tr>
                   <th style={{ width: '85px' }}>INDEX</th>

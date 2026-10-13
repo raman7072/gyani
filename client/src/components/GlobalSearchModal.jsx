@@ -94,7 +94,9 @@ export function GlobalSearchModal({ isOpen, onClose, projects, notes, docs, onSe
                       <FolderGit2 size={15} color="var(--text-primary)" />
                       <div>
                         <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>{proj.title}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{getProjectCategories(proj).join(' • ')} • {proj.status}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                          {getProjectCategories(proj).join(' • ')} • {(proj.status === 'Active' || proj.status === 'Beta Testing' || proj.status === 'βeta testing' || proj.status === 'Beta') ? 'βeta' : proj.status}
+                        </div>
                       </div>
                     </div>
                     <ArrowRight size={13} color="var(--text-tertiary)" />

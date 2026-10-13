@@ -17,8 +17,6 @@ const getEnvConfig = () => {
   return { supabaseUrl, supabaseAnonKey };
 };
 
-let { supabaseUrl, supabaseAnonKey } = getEnvConfig();
-
 export const isSupabaseConfigured = () => {
   const { supabaseUrl, supabaseAnonKey } = getEnvConfig();
   return Boolean(
@@ -343,7 +341,7 @@ export const api = {
     if (isSupabaseConfigured() && supabase) {
       try {
         await supabase.rpc('increment_downloads', { note_id: id });
-      } catch (e) {
+      } catch {
         // quiet ignore
       }
     }
@@ -442,7 +440,9 @@ export const api = {
     if (file.name.endsWith('.md') || file.name.endsWith('.txt')) {
       try {
         previewContent = await file.text();
-      } catch (_) {}
+      } catch {
+        // Ignore preview read errors
+      }
     } else if (file.name.endsWith('.docx')) {
       try {
         const mammothModule = await import('mammoth');
@@ -457,7 +457,6 @@ export const api = {
 
     if (isSupabaseConfigured() && supabase) {
       try {
-        const fileExt = file.name.split('.').pop();
         const safeName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
         const fileName = `${Date.now()}-${safeName}`;
         const filePath = `uploads/${fileName}`;

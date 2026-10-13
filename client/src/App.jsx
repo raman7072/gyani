@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { Overview } from './components/Overview';
 import { ProjectsPage } from './components/ProjectsPage';
@@ -88,7 +88,7 @@ function App() {
   }, []);
 
   // Synchronize active tab and modals with URL hash (#project=id, #note=id, #doc=id/slug, #admin, #projects, #notes, #docs, #overview, or root URL)
-  const syncRouteFromHash = () => {
+  const syncRouteFromHash = useCallback(() => {
     if (typeof window === 'undefined') return;
     const rawHash = (window.location.hash || '').trim();
 
@@ -181,15 +181,11 @@ function App() {
     setSelectedProject(null);
     setSelectedNote(null);
     setSelectedDocId(null);
-  };
+  }, [projects, notes]);
 
-  // Re-sync hash route whenever data loads from backend or localStorage
+  // Synchronize route on data load and browser Back/Forward navigation
   useEffect(() => {
     syncRouteFromHash();
-  }, [projects, notes, docs]);
-
-  // Listen to browser navigation (Back / Forward / direct link pasting)
-  useEffect(() => {
     const handleUrlChange = () => {
       syncRouteFromHash();
     };
@@ -199,7 +195,7 @@ function App() {
       window.removeEventListener('hashchange', handleUrlChange);
       window.removeEventListener('popstate', handleUrlChange);
     };
-  }, [projects, notes, docs]);
+  }, [syncRouteFromHash]);
 
   const handleOpenAdmin = () => {
     setAdminOpen(true);
@@ -280,19 +276,63 @@ function App() {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  // Keep reference of current UI modal/tab states and actions for high-performance global shortcut handling
+  const stateRef = useRef({
+    adminOpen,
+    searchOpen,
+    shortcutsOpen,
+    selectedNote,
+    selectedProject,
+    selectedDocId,
+    activeTab
+  });
+
+  const actionsRef = useRef({
+    handleCloseAdmin,
+    handleOpenAdmin,
+    handleCloseNote,
+    handleCloseProject,
+    handleSelectDoc,
+    handleNavigateTab,
+    toggleTheme
+  });
+
+  useEffect(() => {
+    stateRef.current = {
+      adminOpen,
+      searchOpen,
+      shortcutsOpen,
+      selectedNote,
+      selectedProject,
+      selectedDocId,
+      activeTab
+    };
+    actionsRef.current = {
+      handleCloseAdmin,
+      handleOpenAdmin,
+      handleCloseNote,
+      handleCloseProject,
+      handleSelectDoc,
+      handleNavigateTab,
+      toggleTheme
+    };
+  });
+
   // Global Keyboard Shortcuts (Cmd+K for search, Esc to close, ? for shortcuts, 1-4 for tabs, T for theme)
   useEffect(() => {
     const handleKeyDown = (e) => {
       const tag = e.target.tagName;
       const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable;
+      const current = stateRef.current;
+      const actions = actionsRef.current;
 
       // Curator hotkey: Cmd+Shift+A or Ctrl+Shift+A
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault();
-        if (adminOpen) {
-          handleCloseAdmin();
+        if (current.adminOpen) {
+          actions.handleCloseAdmin();
         } else {
-          handleOpenAdmin();
+          actions.handleOpenAdmin();
         }
         return;
       }
@@ -306,20 +346,20 @@ function App() {
       if (e.key === 'Escape') {
         setSearchOpen(false);
         setShortcutsOpen(false);
-        if (selectedNote) {
-          handleCloseNote();
+        if (current.selectedNote) {
+          actions.handleCloseNote();
           return;
         }
-        if (selectedProject) {
-          handleCloseProject();
+        if (current.selectedProject) {
+          actions.handleCloseProject();
           return;
         }
-        if (selectedDocId) {
-          handleSelectDoc(null);
+        if (current.selectedDocId) {
+          actions.handleSelectDoc(null);
           return;
         }
-        if (adminOpen) {
-          handleCloseAdmin();
+        if (current.adminOpen) {
+          actions.handleCloseAdmin();
           return;
         }
       }
@@ -332,18 +372,18 @@ function App() {
       }
 
       // Single-key navigation shortcuts when not typing in form inputs or modals
-      if (!isInput && !searchOpen && !shortcutsOpen && !selectedNote && !selectedProject && !adminOpen) {
-        if (e.key === '1') { e.preventDefault(); handleNavigateTab('overview'); }
-        else if (e.key === '2') { e.preventDefault(); handleNavigateTab('projects'); }
-        else if (e.key === '3') { e.preventDefault(); handleNavigateTab('notes'); }
-        else if (e.key === '4') { e.preventDefault(); handleNavigateTab('docs'); }
-        else if (e.key.toLowerCase() === 't') { e.preventDefault(); toggleTheme(); }
+      if (!isInput && !current.searchOpen && !current.shortcutsOpen && !current.selectedNote && !current.selectedProject && !current.adminOpen) {
+        if (e.key === '1') { e.preventDefault(); actions.handleNavigateTab('overview'); }
+        else if (e.key === '2') { e.preventDefault(); actions.handleNavigateTab('projects'); }
+        else if (e.key === '3') { e.preventDefault(); actions.handleNavigateTab('notes'); }
+        else if (e.key === '4') { e.preventDefault(); actions.handleNavigateTab('docs'); }
+        else if (e.key.toLowerCase() === 't') { e.preventDefault(); actions.toggleTheme(); }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen, shortcutsOpen, selectedNote, selectedProject, adminOpen, selectedDocId, theme, activeTab]);
+  }, []);
 
   // Download Note handler
   const handleDownloadNote = (note) => {

@@ -28,6 +28,21 @@ import {
 } from '../services/supabase';
 import { GyaniLogo } from './GyaniLogo';
 
+// Category management defaults for Projects
+const DEFAULT_CATEGORIES = [
+  'Full-Stack',
+  'Backend / Systems',
+  'Frontend / UI',
+  'AI / Machine Learning',
+  'Systems / Low-Level',
+  'DevOps & Cloud',
+  'Data Engineering',
+  'Mobile Development',
+  'Distributed Systems',
+  'Security & Cryptography',
+  'Open Source Tooling'
+];
+
 export function AdminPanel({ 
   isOpen, 
   onClose, 
@@ -53,20 +68,7 @@ export function AdminPanel({
   const [editingNote, setEditingNote] = useState(null);
   const [editingDoc, setEditingDoc] = useState(null);
 
-  // Category management for Projects (custom and multiple categories)
-  const DEFAULT_CATEGORIES = [
-    'Full-Stack',
-    'Backend / Systems',
-    'Frontend / UI',
-    'AI / Machine Learning',
-    'Systems / Low-Level',
-    'DevOps & Cloud',
-    'Data Engineering',
-    'Mobile Development',
-    'Distributed Systems',
-    'Security & Cryptography',
-    'Open Source Tooling'
-  ];
+
 
   const [projectCategories, setProjectCategories] = useState(['Full-Stack']);
   const [newCategoryInput, setNewCategoryInput] = useState('');
@@ -89,12 +91,55 @@ export function AdminPanel({
     return Array.from(set);
   }, [projects, customCategoriesList]);
 
+  // Aggregated present categories from notes/manuscripts
+  const presentNoteCategories = React.useMemo(() => {
+    const defaultCategories = [
+      'System Design',
+      'Databases',
+      'Distributed Systems',
+      'Algorithms',
+      'Networking',
+      'Cloud Architecture',
+      'Security',
+      'Performance',
+      'Machine Learning'
+    ];
+    const catSet = new Set(defaultCategories);
+    if (Array.isArray(notes)) {
+      notes.forEach(n => {
+        if (n?.category?.trim()) catSet.add(n.category.trim());
+      });
+    }
+    return Array.from(catSet);
+  }, [notes]);
+
+  // Aggregated present categories from documentation articles
+  const presentDocCategories = React.useMemo(() => {
+    const defaultCategories = [
+      'Architecture',
+      'Getting Started',
+      'Guides',
+      'API Reference',
+      'Deep Dive',
+      'Design Patterns',
+      'Infrastructure',
+      'Best Practices'
+    ];
+    const catSet = new Set(defaultCategories);
+    if (Array.isArray(docs)) {
+      docs.forEach(d => {
+        if (d?.category?.trim()) catSet.add(d.category.trim());
+      });
+    }
+    return Array.from(catSet);
+  }, [docs]);
+
   const handleStartNewProject = () => {
     setEditingProject({
       title: '',
       description: '',
       category: 'Full-Stack',
-      status: 'In Progress',
+      status: 'βeta',
       progress: 50,
       repo_url: '',
       demo_url: '',
@@ -702,7 +747,7 @@ export function AdminPanel({
                                   {cat}
                                 </span>
                               ))}
-                              <span>• {proj.status} ({proj.progress}%)</span>
+                              <span>• {(proj.status === 'Active' || proj.status === 'Beta Testing' || proj.status === 'βeta testing' || proj.status === 'Beta') ? 'βeta' : proj.status} ({proj.progress}%)</span>
                               {proj.repo_url && <span>• GitHub: {proj.repo_url}</span>}
                             </div>
                           </div>
@@ -752,9 +797,13 @@ export function AdminPanel({
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                           STATUS
                         </label>
-                        <select name="status" defaultValue={editingProject.status || 'Active'} className="paper-input">
+                        <select
+                          name="status"
+                          defaultValue={editingProject.status === 'Active' || editingProject.status === 'Beta Testing' || editingProject.status === 'βeta testing' || editingProject.status === 'Beta' ? 'βeta' : (editingProject.status || 'βeta')}
+                          className="paper-input"
+                        >
                           <option value="Completed">Completed</option>
-                          <option value="Active">Active</option>
+                          <option value="βeta">βeta</option>
                           <option value="In Progress">In Progress</option>
                           <option value="Planned">Planned</option>
                         </select>
@@ -1152,26 +1201,38 @@ export function AdminPanel({
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          CATEGORY (CUSTOM OR PRESET)
+                          CATEGORY (EDITABLE & SELECT FROM PRESENT)
                         </label>
-                        <input
-                          name="category"
-                          value={editingNote.category || 'System Design'}
-                          onChange={(e) => setEditingNote(prev => ({ ...prev, category: e.target.value }))}
-                          className="paper-input"
-                          list="note-categories-datalist"
-                          placeholder="Select or type custom category..."
-                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                          <select
+                            className="paper-input"
+                            value={presentNoteCategories.includes(editingNote.category) ? editingNote.category : ''}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setEditingNote(prev => ({ ...prev, category: e.target.value }));
+                              }
+                            }}
+                            title="Select from present categories"
+                          >
+                            <option value="">-- Select Present Category --</option>
+                            {presentNoteCategories.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                          <input
+                            name="category"
+                            value={editingNote.category || ''}
+                            onChange={(e) => setEditingNote(prev => ({ ...prev, category: e.target.value }))}
+                            className="paper-input"
+                            list="note-categories-datalist"
+                            placeholder="Or type/edit category..."
+                            required
+                          />
+                        </div>
                         <datalist id="note-categories-datalist">
-                          <option value="System Design" />
-                          <option value="Databases" />
-                          <option value="Distributed Systems" />
-                          <option value="Algorithms" />
-                          <option value="Networking" />
-                          <option value="Cloud Architecture" />
-                          <option value="Security" />
-                          <option value="Performance" />
-                          <option value="Machine Learning" />
+                          {presentNoteCategories.map(cat => (
+                            <option key={cat} value={cat} />
+                          ))}
                         </datalist>
                       </div>
                     </div>
@@ -1335,24 +1396,38 @@ export function AdminPanel({
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          CATEGORY (CUSTOM OR PRESET)
+                          CATEGORY (EDITABLE & SELECT FROM PRESENT)
                         </label>
-                        <input
-                          name="category"
-                          defaultValue={editingDoc.category || 'Architecture'}
-                          className="paper-input"
-                          list="doc-categories-datalist"
-                          placeholder="Select or type custom category..."
-                        />
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px' }}>
+                          <select
+                            className="paper-input"
+                            value={presentDocCategories.includes(editingDoc.category) ? editingDoc.category : ''}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                setEditingDoc(prev => ({ ...prev, category: e.target.value }));
+                              }
+                            }}
+                            title="Select from present categories"
+                          >
+                            <option value="">-- Select Present Category --</option>
+                            {presentDocCategories.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                          <input
+                            name="category"
+                            value={editingDoc.category || ''}
+                            onChange={(e) => setEditingDoc(prev => ({ ...prev, category: e.target.value }))}
+                            className="paper-input"
+                            list="doc-categories-datalist"
+                            placeholder="Or type/edit category..."
+                            required
+                          />
+                        </div>
                         <datalist id="doc-categories-datalist">
-                          <option value="Architecture" />
-                          <option value="Getting Started" />
-                          <option value="Guides" />
-                          <option value="API Reference" />
-                          <option value="Deep Dive" />
-                          <option value="Design Patterns" />
-                          <option value="Infrastructure" />
-                          <option value="Best Practices" />
+                          {presentDocCategories.map(cat => (
+                            <option key={cat} value={cat} />
+                          ))}
                         </datalist>
                       </div>
 

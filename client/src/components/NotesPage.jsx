@@ -4,9 +4,11 @@ import {
   Download, 
   Eye, 
   Search, 
-  HardDrive,
-  Share2,
-  Check
+  HardDrive, 
+  Share2, 
+  Check,
+  Table,
+  Grid
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
 
@@ -22,6 +24,7 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
   };
   const [selectedFormat, setSelectedFormat] = useState('All');
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [viewMode, setViewMode] = useState('directory'); // 'directory' (default) or 'grid'
 
   const formats = ['All', 'PDF', 'DOCX', 'MARKDOWN'];
 
@@ -51,13 +54,37 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       {/* Page Header */}
-      <div className="page-header">
-        <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', marginBottom: '6px' }}>
-          Notes & Files
-        </h1>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', maxWidth: '640px', fontFamily: 'var(--font-serif)' }}>
-          Technical manuscripts, playbooks, and architecture notes. Inspect in-browser or download files directly.
-        </p>
+      <div className="page-header" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', gap: '16px' }}>
+        <div>
+          <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', marginBottom: '6px' }}>
+            Notes & Files
+          </h1>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', maxWidth: '640px', fontFamily: 'var(--font-serif)' }}>
+            Technical manuscripts, playbooks, and architecture notes. Inspect in-browser or download files directly.
+          </p>
+        </div>
+
+        {/* View Toggle */}
+        <div style={{ display: 'flex', gap: '4px', background: 'var(--bg-secondary)', padding: '3px', borderRadius: '5px', border: '1px solid var(--border-color)' }}>
+          <button
+            onClick={() => setViewMode('directory')}
+            className={`paper-stamp ${viewMode === 'directory' ? 'paper-stamp-active' : ''}`}
+            style={{ cursor: 'pointer', border: 'none' }}
+            title="Directory Table View"
+          >
+            <Table size={13} />
+            <span>Directory</span>
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`paper-stamp ${viewMode === 'grid' ? 'paper-stamp-active' : ''}`}
+            style={{ cursor: 'pointer', border: 'none' }}
+            title="Grid View"
+          >
+            <Grid size={13} />
+            <span>Grid</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -120,7 +147,100 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
         </div>
       </div>
 
+      {/* Directory Table View */}
+      {viewMode === 'directory' && filteredNotes.length > 0 && (
+        <div className="paper-table-wrapper">
+          <table className="paper-table">
+            <thead>
+              <tr>
+                <th style={{ width: '38%' }}>Manuscript / File</th>
+                <th style={{ width: '18%' }}>Category</th>
+                <th style={{ width: '16%' }}>Format & Size</th>
+                <th style={{ width: '14%' }}>Tags</th>
+                <th style={{ width: '14%', textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredNotes.map((note) => (
+                <tr key={note.id} className="paper-table-row">
+                  <td>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '2px', fontFamily: 'var(--font-serif)' }}>
+                      {note.title}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: '2px' }}>
+                      {note.file_name}
+                    </div>
+                    {note.description && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '400px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {note.description}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <span className="paper-stamp" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                      {note.category || 'General'}
+                    </span>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <span className={`paper-stamp ${note.file_type === 'PDF' ? 'paper-stamp-red' : note.file_type === 'DOCX' ? 'paper-stamp-blue' : ''}`} style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                        {note.file_type}
+                      </span>
+                      {note.file_size && (
+                        <span className="mono-stamp" style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem' }}>
+                          {note.file_size}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '180px' }}>
+                      {note.tags?.slice(0, 3).map((tag) => (
+                        <span key={tag} className="mono-stamp" style={{ padding: '1px 5px', borderRadius: '3px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontSize: '0.68rem' }}>
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </td>
+                  <td style={{ textAlign: 'right' }}>
+                    <div style={{ display: 'inline-flex', gap: '6px' }}>
+                      <button
+                        onClick={() => onOpenNoteModal(note)}
+                        className="paper-btn paper-btn-sm"
+                        style={{ padding: '5px 9px', fontSize: '0.78rem' }}
+                        title="View document in full-screen reader form"
+                      >
+                        <Eye size={13} />
+                        <span className="hide-on-mobile">View</span>
+                      </button>
+                      <button
+                        onClick={(e) => handleShareNote(e, note)}
+                        className="paper-btn paper-btn-sm"
+                        style={{ padding: '5px 8px' }}
+                        title="Copy share link"
+                      >
+                        {copiedId === note.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
+                      </button>
+                      <button
+                        onClick={() => onDownloadNote(note)}
+                        className="paper-btn paper-btn-primary paper-btn-sm"
+                        style={{ padding: '5px 10px', fontSize: '0.78rem' }}
+                        title="Download document file"
+                      >
+                        <Download size={13} />
+                        <span className="hide-on-mobile">Download</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
       {/* Notes Cards Grid */}
+      {viewMode === 'grid' && (
       <div style={{ 
         display: 'grid', 
         gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 310px), 1fr))', 
@@ -237,6 +357,7 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
           );
         })}
       </div>
+      )}
 
       {/* Empty State */}
       {filteredNotes.length === 0 && (

@@ -44,7 +44,7 @@ export async function copyShareLink(type, identifier, title = '') {
         text: title ? `Check out "${title}" on Gyani:` : 'Explore on Gyani:',
         url: fullUrl
       });
-    } catch (err) {
+    } catch {
       // User cancelled share dialog or dismissed, perfectly normal
     }
   }
