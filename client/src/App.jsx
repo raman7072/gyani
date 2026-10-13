@@ -449,10 +449,6 @@ function App() {
               notes={notes}
               docs={docs}
               onNavigate={handleNavigateTab}
-              onOpenProjectModal={handleOpenProject}
-              onOpenNoteModal={handleOpenNote}
-              onOpenSearch={() => setSearchOpen(true)}
-              onSelectDoc={handleSelectDoc}
             />
           )}
 

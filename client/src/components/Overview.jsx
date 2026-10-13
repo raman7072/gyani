@@ -3,30 +3,24 @@ import {
   FolderGit2, 
   FileText, 
   BookOpen, 
-  ArrowRight, 
   BarChart3, 
   PieChart, 
   Layers, 
   Cpu, 
-  Code2,
-  Clock
+  Code2
 } from 'lucide-react';
-import { GithubIcon } from './GithubIcon';
-import { getProjectCategories } from '../services/supabase';
+import { getProjectCategories, normalizeProjectStatus, normalizeCategory } from '../services/supabase';
 
 export function Overview({ 
   projects = [], 
   notes = [], 
   docs = [], 
-  onNavigate, 
-  onOpenProjectModal, 
-  onOpenNoteModal,
-  onSelectDoc
+  onNavigate
 }) {
   // 1. Projects Statistics & Metrics
   const totalProjects = projects.length;
-  const completedProjects = projects.filter(p => p.status === 'Completed').length;
-  const inProgressProjects = projects.filter(p => p.status === 'In Progress' || p.status === 'Active' || p.status === 'βeta' || p.status === 'βeta testing' || p.status === 'Beta Testing' || p.status === 'Beta').length;
+  const completedProjects = projects.filter(p => normalizeProjectStatus(p.status) === 'Completed').length;
+  const inProgressProjects = projects.filter(p => normalizeProjectStatus(p.status) === 'βeta' || normalizeProjectStatus(p.status) === 'In Progress').length;
   const plannedProjects = Math.max(0, totalProjects - completedProjects - inProgressProjects);
   const completionPercentage = totalProjects > 0 ? Math.round((completedProjects / totalProjects) * 100) : 0;
 
@@ -68,12 +62,7 @@ export function Overview({
   const totalWords = docs.reduce((acc, d) => acc + (d.content ? d.content.split(/\s+/).length : 0), 0);
   const approxReadingMinutes = Math.max(1, Math.round(totalWords / 200));
 
-  // 6. Recent Items for Shelves
-  const recentProjects = projects.slice(0, 5);
-  const recentNotes = notes.slice(0, 5);
-  const recentDocs = docs.slice(0, 5);
-
-  // 7. SVG Donut Chart Calculation
+  // 6. SVG Donut Chart Calculation
   const radius = 38;
   const circumference = 2 * Math.PI * radius;
   const safeTotal = totalProjects || 1;
@@ -84,11 +73,6 @@ export function Overview({
   const completedOffset = 0;
   const activeOffset = -completedDash;
   const plannedOffset = -(completedDash + activeDash);
-
-  const handleReadDoc = (doc) => {
-    if (onSelectDoc) onSelectDoc(doc);
-    onNavigate('docs');
-  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -488,201 +472,7 @@ export function Overview({
 
       </section>
 
-      {/* 4. RECENT DIRECTORIES (3 CLEAN COLUMNS) */}
-      <section className="dashboard-tables-grid">
-        
-        {/* Recent Repositories */}
-        <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
-              <FolderGit2 size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
-              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Recent Repositories
-              </h3>
-            </div>
-            <button 
-              onClick={() => onNavigate('projects')}
-              className="paper-btn paper-btn-sm"
-              style={{ fontSize: '0.72rem', padding: '3px 7px', flexShrink: 0 }}
-            >
-              <span>View All</span>
-              <ArrowRight size={11} />
-            </button>
-          </div>
-
-          <div className="dashboard-mini-table">
-            {recentProjects.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
-                No projects recorded.
-              </div>
-            ) : (
-              recentProjects.map((project) => (
-                <div key={project.id} className="dashboard-mini-row">
-                  <div className="dashboard-mini-info">
-                    <div className="dashboard-mini-title" title={project.title}>
-                      {project.title}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
-                      {getProjectCategories(project).map((cat, idx) => (
-                        <span key={idx} className="paper-stamp" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                          {cat}
-                        </span>
-                      ))}
-                      <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                        {(project.status === 'Active' || project.status === 'Beta Testing' || project.status === 'βeta testing' || project.status === 'Beta') ? 'βeta' : project.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="dashboard-mini-actions">
-                    <button
-                      onClick={() => onOpenProjectModal(project)}
-                      className="paper-btn paper-btn-sm"
-                      style={{ fontSize: '0.72rem', padding: '3px 7px' }}
-                      title="Inspect specs"
-                    >
-                      Inspect
-                    </button>
-                    {project.repo_url && (
-                      <a
-                        href={project.repo_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="paper-btn paper-btn-icon"
-                        style={{ padding: '4px' }}
-                        title="GitHub"
-                      >
-                        <GithubIcon size={12} />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Recent Manuscripts */}
-        <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
-              <FileText size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
-              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Recent Documents
-              </h3>
-            </div>
-            <button 
-              onClick={() => onNavigate('notes')}
-              className="paper-btn paper-btn-sm"
-              style={{ fontSize: '0.72rem', padding: '3px 7px', flexShrink: 0 }}
-            >
-              <span>View All</span>
-              <ArrowRight size={11} />
-            </button>
-          </div>
-
-          <div className="dashboard-mini-table">
-            {recentNotes.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
-                No documents in vault.
-              </div>
-            ) : (
-              recentNotes.map((note) => (
-                <div key={note.id} className="dashboard-mini-row">
-                  <div className="dashboard-mini-info">
-                    <div className="dashboard-mini-title" title={note.title}>
-                      {note.title}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
-                      <span className={`paper-stamp ${note.file_type === 'PDF' ? 'paper-stamp-red' : note.file_type === 'DOCX' ? 'paper-stamp-blue' : ''}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                        {note.file_type || 'DOC'}
-                      </span>
-                      <span className="mono-stamp" style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>
-                        {note.file_size}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="dashboard-mini-actions">
-                    <button
-                      onClick={() => onOpenNoteModal(note)}
-                      className="paper-btn paper-btn-sm"
-                      style={{ fontSize: '0.72rem', padding: '3px 7px' }}
-                      title="Open viewer"
-                    >
-                      Open
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Recent Documentation */}
-        <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
-              <BookOpen size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
-              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Documentation
-              </h3>
-            </div>
-            <button 
-              onClick={() => onNavigate('docs')}
-              className="paper-btn paper-btn-sm"
-              style={{ fontSize: '0.72rem', padding: '3px 7px', flexShrink: 0 }}
-            >
-              <span>View All</span>
-              <ArrowRight size={11} />
-            </button>
-          </div>
-
-          <div className="dashboard-mini-table">
-            {recentDocs.length === 0 ? (
-              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
-                No documentation articles.
-              </div>
-            ) : (
-              recentDocs.map((doc) => {
-                const words = doc.content ? doc.content.split(/\s+/).length : 0;
-                const readingTime = Math.max(1, Math.round(words / 200));
-                return (
-                  <div key={doc.id} className="dashboard-mini-row">
-                    <div className="dashboard-mini-info">
-                      <div className="dashboard-mini-title" title={doc.title}>
-                        {doc.title}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
-                        <span className="paper-stamp paper-stamp-blue" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                          {doc.category || 'General'}
-                        </span>
-                        <span className="mono-stamp" style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
-                          <Clock size={10} />
-                          ~{readingTime}m
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="dashboard-mini-actions">
-                      <button
-                        onClick={() => handleReadDoc(doc)}
-                        className="paper-btn paper-btn-sm"
-                        style={{ fontSize: '0.72rem', padding: '3px 7px' }}
-                        title="Read document"
-                      >
-                        Read
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-      </section>
-
     </div>
   );
 }
+

@@ -33,7 +33,7 @@ const DEFAULT_CATEGORIES = [
   'Full-Stack',
   'Backend / Systems',
   'Frontend / UI',
-  'AI / Machine Learning',
+  'AI/ML',
   'Systems / Low-Level',
   'DevOps & Cloud',
   'Data Engineering',
@@ -102,7 +102,7 @@ export function AdminPanel({
       'Cloud Architecture',
       'Security',
       'Performance',
-      'Machine Learning'
+      'AI/ML'
     ];
     const catSet = new Set(defaultCategories);
     if (Array.isArray(notes)) {

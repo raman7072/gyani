@@ -6,13 +6,12 @@ import {
   Grid, 
   List, 
   ArrowUpRight,
-  Info,
   Share2,
   Check
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
 import { GithubIcon } from './GithubIcon';
-import { getProjectCategories } from '../services/supabase';
+import { getProjectCategories, normalizeProjectStatus } from '../services/supabase';
 import { useResponsiveViewMode } from '../hooks/useResponsiveViewMode';
 
 export function ProjectsPage({ projects, onOpenProjectModal }) {
@@ -49,10 +48,8 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
         cats.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesCategory = selectedCategory === 'All' || cats.includes(selectedCategory);
-      const matchesStatus = selectedStatus === 'All' || 
-        (selectedStatus === 'βeta' || selectedStatus === 'βeta testing' || selectedStatus === 'Beta Testing' || selectedStatus === 'Beta'
-          ? (project.status === 'βeta' || project.status === 'βeta testing' || project.status === 'Beta Testing' || project.status === 'Beta' || project.status === 'Active') 
-          : project.status === selectedStatus);
+      const normStatus = normalizeProjectStatus(project.status);
+      const matchesStatus = selectedStatus === 'All' || normStatus === selectedStatus;
 
       return matchesSearch && matchesCategory && matchesStatus;
     });
@@ -116,7 +113,9 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
           {/* Status selector */}
           <div style={{ display: 'flex', gap: '5px', overflowX: 'auto' }}>
             {statuses.map(st => {
-              const count = st === 'All' ? projects.length : projects.filter(p => p.status === st).length;
+              const count = st === 'All' 
+                ? projects.length 
+                : projects.filter(p => normalizeProjectStatus(p.status) === st).length;
               return (
                 <button
                   key={st}
@@ -165,12 +164,14 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
             <div 
               key={project.id} 
               className="paper-card" 
+              onClick={() => onOpenProjectModal(project)}
               style={{ 
                 padding: '24px', 
                 display: 'flex', 
                 flexDirection: 'column', 
                 justifyContent: 'space-between',
-                minHeight: '270px'
+                minHeight: '270px',
+                cursor: 'pointer'
               }}
             >
               <div>
@@ -238,53 +239,33 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                   </div>
                 )}
 
-                {/* 4 Card Action Buttons properly aligned with zero overflow */}
-                <div style={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '7px',
-                  paddingTop: '14px',
-                  borderTop: '1px solid var(--border-color)',
-                  width: '100%',
-                  boxSizing: 'border-box'
-                }}>
-                  {/* 1. Architecture Notes */}
-                  <button
-                    onClick={() => onOpenProjectModal(project)}
-                    className="paper-btn paper-btn-sm"
-                    style={{ width: '100%', justifyContent: 'center', padding: '6px 8px', fontSize: '0.78rem' }}
-                    title="Read architecture overview & design notes"
-                  >
-                    <Info size={13} />
-                    <span>Notes</span>
-                  </button>
-
-                  {/* 2. Open Live Deployment (prominent primary button) */}
-                  {project.demo_url ? (
+                {/* Card Action Buttons (without redundant Notes button) */}
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    gap: '7px',
+                    paddingTop: '14px',
+                    borderTop: '1px solid var(--border-color)',
+                    width: '100%',
+                    boxSizing: 'border-box'
+                  }}
+                >
+                  {project.demo_url && (
                     <a
                       href={project.demo_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="paper-btn paper-btn-primary paper-btn-sm"
-                      style={{ width: '100%', justifyContent: 'center', padding: '6px 8px', fontSize: '0.78rem' }}
+                      style={{ flex: 1, justifyContent: 'center', padding: '6px 8px', fontSize: '0.78rem' }}
                       title="Open Live Deployment"
                     >
                       <ExternalLink size={13} />
                       <span>Live Demo</span>
                     </a>
-                  ) : (
-                    <button
-                      onClick={(e) => handleShareProject(e, project)}
-                      className="paper-btn paper-btn-sm"
-                      style={{ width: '100%', justifyContent: 'center', padding: '6px 8px', fontSize: '0.78rem' }}
-                      title="Copy direct share link to this project"
-                    >
-                      {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
-                      <span>{copiedId === project.id ? 'Copied' : 'Share'}</span>
-                    </button>
                   )}
 
-                  {/* 3. GitHub Repository Link */}
                   {project.repo_url && (
                     <a
                       href={project.repo_url}
@@ -292,11 +273,10 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                       rel="noopener noreferrer"
                       className="paper-btn paper-btn-sm"
                       style={{ 
-                        width: '100%', 
+                        flex: 1, 
                         justifyContent: 'center', 
                         padding: '6px 8px', 
-                        fontSize: '0.78rem',
-                        gridColumn: !project.demo_url ? '1 / -1' : undefined
+                        fontSize: '0.78rem'
                       }}
                       title="Inspect GitHub Repository"
                     >
@@ -306,24 +286,15 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                     </a>
                   )}
 
-                  {/* 4. Share Project (when demo_url is present) */}
-                  {project.demo_url && (
-                    <button
-                      onClick={(e) => handleShareProject(e, project)}
-                      className="paper-btn paper-btn-sm"
-                      style={{ 
-                        width: '100%', 
-                        justifyContent: 'center', 
-                        padding: '6px 8px', 
-                        fontSize: '0.78rem',
-                        gridColumn: !project.repo_url ? '1 / -1' : undefined
-                      }}
-                      title="Copy direct share link to this project"
-                    >
-                      {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
-                      <span>{copiedId === project.id ? 'Copied' : 'Share'}</span>
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => handleShareProject(e, project)}
+                    className="paper-btn paper-btn-sm"
+                    style={{ padding: '6px 10px', fontSize: '0.78rem' }}
+                    title="Copy direct share link to this project"
+                  >
+                    {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
+                    <span>{copiedId === project.id ? 'Copied' : 'Share'}</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -348,9 +319,8 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
 
           <div className="dashboard-mini-table">
             {filteredProjects.map((project) => {
-              const isBeta = project.status === 'Active' || project.status === 'Beta Testing' || project.status === 'βeta testing' || project.status === 'Beta' || project.status === 'βeta';
-              const statusLabel = isBeta ? 'βeta' : project.status;
-              const statusClass = project.status === 'Completed' ? 'paper-stamp-sage' : (isBeta ? 'paper-stamp-red' : '');
+              const normStatus = normalizeProjectStatus(project.status);
+              const statusClass = normStatus === 'Completed' ? 'paper-stamp-sage' : (normStatus === 'βeta' ? 'paper-stamp-red' : '');
 
               return (
                 <div 
@@ -375,7 +345,7 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                         </span>
                       ))}
                       <span className={`paper-stamp ${statusClass}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                        {statusLabel}
+                        {normStatus}
                       </span>
                       {project.tags?.slice(0, 3).map(tag => (
                         <span key={tag} className="mono-stamp" style={{ fontSize: '0.65rem', padding: '0 4px', color: 'var(--text-secondary)' }}>
@@ -386,14 +356,6 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                   </div>
 
                   <div className="dashboard-mini-actions" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => onOpenProjectModal(project)}
-                      className="paper-btn paper-btn-sm"
-                      style={{ fontSize: '0.72rem', padding: '3px 8px' }}
-                      title="Inspect specs"
-                    >
-                      Inspect
-                    </button>
                     {project.repo_url && (
                       <a
                         href={project.repo_url}

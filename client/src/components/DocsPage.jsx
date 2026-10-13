@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
 import { useResponsiveViewMode } from '../hooks/useResponsiveViewMode';
+import { normalizeCategory } from '../services/supabase';
 import { marked } from 'marked';
 import mermaid from 'mermaid';
 
@@ -868,15 +869,6 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
                         {isCopied ? <Check size={11} color="var(--accent-sage)" /> : <Share2 size={11} />}
                         <span>{isCopied ? 'Copied' : 'Share'}</span>
                       </button>
-
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleSelectDoc(doc); }}
-                        className="paper-btn paper-btn-sm paper-btn-primary"
-                        style={{ padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <span>Read</span>
-                        <ChevronRight size={11} />
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -946,14 +938,6 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
                         title="Share link"
                       >
                         {isCopied ? <Check size={12} color="var(--accent-sage)" /> : <Share2 size={12} />}
-                      </button>
-                      <button
-                        onClick={() => handleSelectDoc(doc)}
-                        className="paper-btn paper-btn-primary paper-btn-sm"
-                        style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
-                      >
-                        <span>Read</span>
-                        <ChevronRight size={11} />
                       </button>
                     </div>
                   </div>

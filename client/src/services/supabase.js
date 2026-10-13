@@ -72,19 +72,52 @@ export const INITIAL_PROJECTS = [];
 export const INITIAL_NOTES = [];
 export const INITIAL_DOCS = [];
 
+// Helper to normalize category labels (e.g. AI / Machine Learning -> AI/ML)
+export const normalizeCategory = (cat) => {
+  if (!cat || typeof cat !== 'string') return cat;
+  const trimmed = cat.trim();
+  if (trimmed === 'AI / Machine Learning' || trimmed === 'Machine Learning') {
+    return 'AI/ML';
+  }
+  return trimmed;
+};
+
+// Helper to normalize project status across all variations
+export const normalizeProjectStatus = (status) => {
+  if (!status) return 'Planned';
+  const s = String(status).trim().toLowerCase();
+  if (s === 'active' || s.includes('beta') || s.includes('βeta')) {
+    return 'βeta';
+  }
+  if (s === 'completed' || s === 'complete' || s === 'done') {
+    return 'Completed';
+  }
+  if (s === 'in progress' || s === 'in-progress' || s === 'progress') {
+    return 'In Progress';
+  }
+  if (s === 'planned' || s === 'planning') {
+    return 'Planned';
+  }
+  return status;
+};
+
 // Helper to extract clean array of categories from project object
 export const getProjectCategories = (project) => {
   if (!project) return ['Full-Stack'];
   if (Array.isArray(project.categories) && project.categories.length > 0) {
-    const valid = project.categories.filter(c => typeof c === 'string' && c.trim());
+    const valid = project.categories
+      .filter(c => typeof c === 'string' && c.trim())
+      .map(normalizeCategory);
     if (valid.length > 0) return valid;
   }
   if (typeof project.category === 'string' && project.category.trim()) {
-    const list = project.category.split(',').map(c => c.trim()).filter(Boolean);
-    return list.length > 0 ? list : [project.category.trim()];
+    const list = project.category.split(',').map(c => normalizeCategory(c.trim())).filter(Boolean);
+    return list.length > 0 ? list : [normalizeCategory(project.category.trim())];
   }
   if (Array.isArray(project.category) && project.category.length > 0) {
-    const valid = project.category.filter(c => typeof c === 'string' && c.trim());
+    const valid = project.category
+      .filter(c => typeof c === 'string' && c.trim())
+      .map(normalizeCategory);
     if (valid.length > 0) return valid;
   }
   return ['Full-Stack'];

@@ -159,13 +159,6 @@ export function ProjectDetailsModal({ project, onClose }) {
             </div>
           </div>
         )}
-
-        {/* Footer */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>
-          <button onClick={onClose} className="paper-btn">
-            Close
-          </button>
-        </div>
       </div>
     </div>
   );

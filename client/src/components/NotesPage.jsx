@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { 
   FileText, 
   Download, 
-  Eye, 
   Search, 
   HardDrive, 
   Share2, 
@@ -12,6 +11,7 @@ import {
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
 import { useResponsiveViewMode } from '../hooks/useResponsiveViewMode';
+import { normalizeCategory } from '../services/supabase';
 
 export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -32,21 +32,23 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
   const categories = useMemo(() => {
     const set = new Set(['All']);
     notes.forEach(n => {
-      if (n.category) set.add(n.category);
+      if (n.category) set.add(normalizeCategory(n.category));
     });
     return Array.from(set);
   }, [notes]);
 
   const filteredNotes = useMemo(() => {
     return notes.filter(note => {
+      const cat = normalizeCategory(note.category);
       const matchesSearch = 
         note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         note.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         note.file_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        note.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+        note.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        cat?.toLowerCase().includes(searchTerm.toLowerCase());
 
       const matchesFormat = selectedFormat === 'All' || note.file_type?.toUpperCase() === selectedFormat;
-      const matchesCategory = selectedCategory === 'All' || note.category === selectedCategory;
+      const matchesCategory = selectedCategory === 'All' || cat === selectedCategory;
 
       return matchesSearch && matchesFormat && matchesCategory;
     });
@@ -190,7 +192,7 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
                       </span>
                       {note.category && (
                         <span className="paper-stamp" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                          {note.category}
+                          {normalizeCategory(note.category)}
                         </span>
                       )}
                       {note.file_size && (
@@ -207,14 +209,6 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
                   </div>
 
                   <div className="dashboard-mini-actions" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => onOpenNoteModal(note)}
-                      className="paper-btn paper-btn-sm"
-                      style={{ fontSize: '0.72rem', padding: '3px 8px' }}
-                      title="Open viewer"
-                    >
-                      Open
-                    </button>
                     <button
                       onClick={(e) => handleShareNote(e, note)}
                       className="paper-btn paper-btn-icon"
@@ -254,12 +248,14 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
             <div 
               key={note.id} 
               className="paper-card" 
+              onClick={() => onOpenNoteModal(note)}
               style={{ 
                 padding: '24px', 
                 display: 'flex', 
                 flexDirection: 'column', 
                 justifyContent: 'space-between',
-                minHeight: '260px'
+                minHeight: '260px',
+                cursor: 'pointer'
               }}
             >
               <div>
@@ -270,7 +266,7 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
                       {note.file_type}
                     </span>
                     <span className="paper-stamp">
-                      {note.category}
+                      {normalizeCategory(note.category)}
                     </span>
                   </div>
 
@@ -305,7 +301,7 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
                         key={tag} 
                         className="mono-stamp"
                         style={{ 
-                          padding: '1px 6px', 
+                          padding: '2px 6px', 
                           borderRadius: '3px', 
                           background: 'var(--bg-secondary)', 
                           border: '1px solid var(--border-color)',
@@ -319,27 +315,21 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
                 )}
               </div>
 
-              {/* Action Buttons: View in Form & Download Button */}
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '8px',
-                paddingTop: '14px',
-                borderTop: '1px solid var(--border-color)'
-              }}>
-                <button
-                  onClick={() => onOpenNoteModal(note)}
-                  className="paper-btn paper-btn-sm"
-                  style={{ flex: 1 }}
-                  title="View document in full-screen reader form"
-                >
-                  <Eye size={13} />
-                  <span>View Form</span>
-                </button>
-
+              {/* Action Buttons: Share & Download Button (without redundant Open button) */}
+              <div 
+                onClick={(e) => e.stopPropagation()}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px',
+                  paddingTop: '14px',
+                  borderTop: '1px solid var(--border-color)'
+                }}
+              >
                 <button
                   onClick={(e) => handleShareNote(e, note)}
                   className="paper-btn paper-btn-sm"
+                  style={{ flex: 1, justifyContent: 'center' }}
                   title="Copy direct share link to this note"
                 >
                   {copiedId === note.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
@@ -349,7 +339,7 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
                 <button
                   onClick={() => onDownloadNote(note)}
                   className="paper-btn paper-btn-primary paper-btn-sm"
-                  style={{ flex: 1.2 }}
+                  style={{ flex: 1, justifyContent: 'center' }}
                   title="Download raw document file"
                 >
                   <Download size={13} />
