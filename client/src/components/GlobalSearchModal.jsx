@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, FolderGit2, FileText, BookOpen, ArrowRight } from 'lucide-react';
+import { getProjectCategories } from '../services/supabase';
 
 export function GlobalSearchModal({ isOpen, onClose, projects, notes, docs, onSelectResult }) {
   const [query, setQuery] = useState('');
@@ -21,11 +22,15 @@ export function GlobalSearchModal({ isOpen, onClose, projects, notes, docs, onSe
 
   if (!isOpen) return null;
 
-  const filteredProjects = projects.filter(p => 
-    p.title.toLowerCase().includes(query.toLowerCase()) || 
-    p.description?.toLowerCase().includes(query.toLowerCase()) ||
-    p.tags?.some(t => t.toLowerCase().includes(query.toLowerCase()))
-  ).slice(0, 4);
+  const filteredProjects = projects.filter(p => {
+    const cats = getProjectCategories(p);
+    return (
+      p.title.toLowerCase().includes(query.toLowerCase()) || 
+      p.description?.toLowerCase().includes(query.toLowerCase()) ||
+      p.tags?.some(t => t.toLowerCase().includes(query.toLowerCase())) ||
+      cats.some(c => c.toLowerCase().includes(query.toLowerCase()))
+    );
+  }).slice(0, 4);
 
   const filteredNotes = notes.filter(n => 
     n.title.toLowerCase().includes(query.toLowerCase()) || 
@@ -89,7 +94,7 @@ export function GlobalSearchModal({ isOpen, onClose, projects, notes, docs, onSe
                       <FolderGit2 size={15} color="var(--text-primary)" />
                       <div>
                         <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>{proj.title}</div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{proj.category} • {proj.status}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{getProjectCategories(proj).join(' • ')} • {proj.status}</div>
                       </div>
                     </div>
                     <ArrowRight size={13} color="var(--text-tertiary)" />

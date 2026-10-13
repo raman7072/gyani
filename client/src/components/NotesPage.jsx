@@ -52,19 +52,11 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
       {/* Page Header */}
       <div className="page-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-          <span className="paper-stamp paper-stamp-active">
-            ARCHIVE
-          </span>
-          <span className="paper-stamp">
-            MANUSCRIPTS & STUDY NOTES
-          </span>
-        </div>
         <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', marginBottom: '6px' }}>
-          Documents & Study Vault
+          Notes & Files
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', maxWidth: '640px', fontFamily: 'var(--font-serif)' }}>
-          Archived technical summaries, engineering playbooks, and system design notes. Inspect full texts in-browser or download files directly.
+          Technical manuscripts, playbooks, and architecture notes. Inspect in-browser or download files directly.
         </p>
       </div>
 
@@ -131,8 +123,8 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
       {/* Notes Cards Grid */}
       <div style={{ 
         display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', 
-        gap: '20px' 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 310px), 1fr))', 
+        gap: '22px' 
       }}>
         {filteredNotes.map((note) => {
           return (
@@ -176,28 +168,32 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
                 </div>
 
                 {/* Description */}
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
-                  {note.description}
-                </p>
+                {note.description && (
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
+                    {note.description}
+                  </p>
+                )}
 
                 {/* Tags */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '18px' }}>
-                  {note.tags?.map((tag) => (
-                    <span 
-                      key={tag} 
-                      className="mono-stamp"
-                      style={{ 
-                        padding: '1px 6px', 
-                        borderRadius: '3px', 
-                        background: 'var(--bg-secondary)', 
-                        border: '1px solid var(--border-color)',
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
+                {note.tags && note.tags.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '18px' }}>
+                    {note.tags.map((tag) => (
+                      <span 
+                        key={tag} 
+                        className="mono-stamp"
+                        style={{ 
+                          padding: '1px 6px', 
+                          borderRadius: '3px', 
+                          background: 'var(--bg-secondary)', 
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-secondary)'
+                        }}
+                      >
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Action Buttons: View in Form & Download Button */}

@@ -8,9 +8,11 @@ import {
   PieChart, 
   Layers, 
   Cpu, 
-  Code2
+  Code2,
+  Clock
 } from 'lucide-react';
 import { GithubIcon } from './GithubIcon';
+import { getProjectCategories } from '../services/supabase';
 
 export function Overview({ 
   projects = [], 
@@ -18,7 +20,8 @@ export function Overview({
   docs = [], 
   onNavigate, 
   onOpenProjectModal, 
-  onOpenNoteModal 
+  onOpenNoteModal,
+  onSelectDoc
 }) {
   // 1. Projects Statistics & Metrics
   const totalProjects = projects.length;
@@ -29,8 +32,10 @@ export function Overview({
 
   // 2. Project Categories Aggregation
   const categoryMap = projects.reduce((acc, p) => {
-    const cat = p.category || 'General';
-    acc[cat] = (acc[cat] || 0) + 1;
+    const cats = getProjectCategories(p);
+    cats.forEach(cat => {
+      acc[cat] = (acc[cat] || 0) + 1;
+    });
     return acc;
   }, {});
   const sortedCategories = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]);
@@ -63,9 +68,14 @@ export function Overview({
   const totalWords = docs.reduce((acc, d) => acc + (d.content ? d.content.split(/\s+/).length : 0), 0);
   const approxReadingMinutes = Math.max(1, Math.round(totalWords / 200));
 
-  // 6. SVG Donut Chart Calculation
+  // 6. Recent Items for Shelves
+  const recentProjects = projects.slice(0, 5);
+  const recentNotes = notes.slice(0, 5);
+  const recentDocs = docs.slice(0, 5);
+
+  // 7. SVG Donut Chart Calculation
   const radius = 38;
-  const circumference = 2 * Math.PI * radius; // ~238.76
+  const circumference = 2 * Math.PI * radius;
   const safeTotal = totalProjects || 1;
   const completedDash = (completedProjects / safeTotal) * circumference;
   const activeDash = (inProgressProjects / safeTotal) * circumference;
@@ -75,24 +85,33 @@ export function Overview({
   const activeOffset = -completedDash;
   const plannedOffset = -(completedDash + activeDash);
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '22px' }}>
-      
-      {/* 1. COMPACT HERO / SYSTEM STATUS STRIP (Zero redundant navigation tabs) */}
-      <section className="paper-panel dashboard-hero">
-        <h1 className="dashboard-hero-title">
-          Engineering & Knowledge Overview
-        </h1>
-        
-        <p className="dashboard-hero-subtitle">
-          Real-time index of software repositories, technical study vaults, and system documentation.
-        </p>
-      </section>
+  const handleReadDoc = (doc) => {
+    if (onSelectDoc) onSelectDoc(doc);
+    onNavigate('docs');
+  };
 
-      {/* 2. CORE METRICS LEDGER */}
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      
+      {/* 1. CLEAN MINIMALIST HEADER */}
+      <div className="page-header" style={{ marginBottom: 0 }}>
+        <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', marginBottom: '6px' }}>
+          Overview
+        </h1>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', maxWidth: '640px', fontFamily: 'var(--font-serif)' }}>
+          Summary of software repositories, study manuscripts, and documentation.
+        </p>
+      </div>
+
+      {/* 2. CORE METRICS (4 CLEAN CARDS) */}
       <section className="dashboard-metrics-grid">
-        {/* Projects Metric */}
-        <div className="paper-panel-subtle dashboard-metric-card">
+        {/* Repositories */}
+        <div 
+          className="paper-panel-subtle dashboard-metric-card"
+          onClick={() => onNavigate('projects')}
+          style={{ cursor: 'pointer' }}
+          title="View Projects"
+        >
           <div>
             <div className="dashboard-metric-header">
               <span className="mono-stamp" style={{ color: 'var(--text-tertiary)' }}>
@@ -109,17 +128,22 @@ export function Overview({
               <strong style={{ color: 'var(--text-primary)' }}>{completedProjects}</strong> done • {inProgressProjects} active
             </span>
             <span className="paper-stamp paper-stamp-sage" style={{ fontSize: '0.65rem', padding: '1px 5px' }}>
-              {completionPercentage}% DONE
+              {completionPercentage}%
             </span>
           </div>
         </div>
 
-        {/* Study Vault Metric */}
-        <div className="paper-panel-subtle dashboard-metric-card">
+        {/* Study Vault */}
+        <div 
+          className="paper-panel-subtle dashboard-metric-card"
+          onClick={() => onNavigate('notes')}
+          style={{ cursor: 'pointer' }}
+          title="View Manuscripts"
+        >
           <div>
             <div className="dashboard-metric-header">
               <span className="mono-stamp" style={{ color: 'var(--text-tertiary)' }}>
-                STUDY VAULT
+                MANUSCRIPTS
               </span>
               <FileText size={15} color="var(--text-secondary)" />
             </div>
@@ -129,16 +153,15 @@ export function Overview({
           </div>
           <div className="dashboard-metric-sub">
             <span>{pdfCount} PDF • {docxCount} DOCX • {mdCount} MD</span>
-            
           </div>
         </div>
 
-        {/* Documentation Metric */}
+        {/* Documentation */}
         <div 
           className="paper-panel-subtle dashboard-metric-card"
           onClick={() => onNavigate('docs')}
           style={{ cursor: 'pointer' }}
-          title="Browse documentation index"
+          title="View Documentation"
         >
           <div>
             <div className="dashboard-metric-header">
@@ -153,16 +176,20 @@ export function Overview({
           </div>
           <div className="dashboard-metric-sub">
             <span>{docCategories.length} categories • ~{approxReadingMinutes}m read</span>
-            
           </div>
         </div>
 
-        {/* Tech Stack Metric */}
-        <div className="paper-panel-subtle dashboard-metric-card">
+        {/* Tech Stack */}
+        <div 
+          className="paper-panel-subtle dashboard-metric-card"
+          onClick={() => onNavigate('projects')}
+          style={{ cursor: 'pointer' }}
+          title="View Tech Stack"
+        >
           <div>
             <div className="dashboard-metric-header">
               <span className="mono-stamp" style={{ color: 'var(--text-tertiary)' }}>
-                INDEXED TECH
+                TECHNOLOGIES
               </span>
               <Cpu size={15} color="var(--text-secondary)" />
             </div>
@@ -171,39 +198,44 @@ export function Overview({
             </div>
           </div>
           <div className="dashboard-metric-sub">
-            <span>Across {totalProjects} systems</span>
-            
+            <span>Across {totalProjects} projects</span>
           </div>
         </div>
       </section>
 
-      {/* 3. VISUAL CHARTS & GRAPHS */}
+      {/* 3. VISUAL CHARTS & DISTRIBUTIONS */}
       <section className="dashboard-charts-grid">
         
-        {/* CHART 1: Category & Domain Distribution (Bar Chart) */}
+        {/* CHART 1: Category & Domain Distribution */}
         <div className="paper-card dashboard-chart-card">
           <div className="dashboard-chart-title-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <BarChart3 size={15} color="var(--text-primary)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Domain & Category Distribution
+                Categories
               </h3>
             </div>
             <span className="mono-stamp" style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-              {sortedCategories.length} Categories
+              {sortedCategories.length} Domains
             </span>
           </div>
 
           {sortedCategories.length === 0 ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
-              No project categories cataloged yet.
+              No categories cataloged yet.
             </div>
           ) : (
             <div className="chart-bar-list">
               {sortedCategories.slice(0, 5).map(([category, count]) => {
                 const percentage = totalProjects > 0 ? Math.round((count / totalProjects) * 100) : 0;
                 return (
-                  <div key={category} className="chart-bar-item">
+                  <div 
+                    key={category} 
+                    className="chart-bar-item"
+                    onClick={() => onNavigate('projects')}
+                    style={{ cursor: 'pointer' }}
+                    title={`${category} (${count})`}
+                  >
                     <div className="chart-bar-label-row">
                       <span style={{ 
                         fontWeight: 600, 
@@ -212,10 +244,10 @@ export function Overview({
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                         maxWidth: '65%'
-                      }} title={category}>
+                      }}>
                         {category}
                       </span>
-                      <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>
+                      <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', flexShrink: 0, fontSize: '0.75rem' }}>
                         {count} ({percentage}%)
                       </span>
                     </div>
@@ -235,13 +267,13 @@ export function Overview({
           )}
         </div>
 
-        {/* CHART 2: Delivery Velocity & Status Gauge (SVG Donut Chart) */}
+        {/* CHART 2: Project Delivery Gauge */}
         <div className="paper-card dashboard-chart-card">
           <div className="dashboard-chart-title-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <PieChart size={15} color="var(--text-primary)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Project Delivery & Status Gauge
+                Project Status
               </h3>
             </div>
             <span className="mono-stamp" style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
@@ -252,7 +284,6 @@ export function Overview({
           <div className="donut-layout">
             <div className="donut-circle-box">
               <svg width="130" height="130" viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-                {/* Background Track */}
                 <circle
                   cx="50"
                   cy="50"
@@ -263,7 +294,6 @@ export function Overview({
                 />
                 {totalProjects > 0 ? (
                   <>
-                    {/* Completed Ring */}
                     <circle
                       cx="50"
                       cy="50"
@@ -275,7 +305,6 @@ export function Overview({
                       strokeDashoffset={completedOffset}
                       strokeLinecap="round"
                     />
-                    {/* Active Ring */}
                     <circle
                       cx="50"
                       cy="50"
@@ -286,7 +315,6 @@ export function Overview({
                       strokeDasharray={`${activeDash} ${circumference}`}
                       strokeDashoffset={activeOffset}
                     />
-                    {/* Planned Ring */}
                     <circle
                       cx="50"
                       cy="50"
@@ -319,7 +347,6 @@ export function Overview({
               </div>
             </div>
 
-            {/* Donut Legend */}
             <div className="donut-legend">
               <div className="donut-legend-item">
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -348,13 +375,13 @@ export function Overview({
           </div>
         </div>
 
-        {/* CHART 3: Vault Resource Formats Breakdown */}
+        {/* CHART 3: Study Vault Format Breakdown */}
         <div className="paper-card dashboard-chart-card">
           <div className="dashboard-chart-title-bar">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Layers size={15} color="var(--text-primary)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Study Vault Format Breakdown
+                File Formats
               </h3>
             </div>
             <span className="mono-stamp" style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
@@ -363,7 +390,6 @@ export function Overview({
           </div>
 
           <div>
-            {/* Multi-segment stacked progress bar */}
             <div className="stacked-format-bar">
               {totalNotes > 0 ? (
                 sortedFormats.map(([type, count], idx) => {
@@ -383,7 +409,7 @@ export function Overview({
                         width: `${pct}%`, 
                         background: colors[idx % colors.length] 
                       }}
-                      title={`${type}: ${count} files (${Math.round((count / totalNotes) * 100)}%)`}
+                      title={`${type}: ${count}`}
                     />
                   );
                 })
@@ -392,7 +418,6 @@ export function Overview({
               )}
             </div>
 
-            {/* Format Counts */}
             <div className="format-breakdown-grid">
               {sortedFormats.map(([type, count], idx) => {
                 const colors = [
@@ -403,7 +428,12 @@ export function Overview({
                   'var(--text-tertiary)'
                 ];
                 return (
-                  <div key={type} className="paper-panel-subtle" style={{ padding: '8px 10px', borderRadius: '4px' }}>
+                  <div 
+                    key={type} 
+                    className="paper-panel-subtle" 
+                    onClick={() => onNavigate('notes')}
+                    style={{ padding: '8px 10px', borderRadius: '4px', cursor: 'pointer' }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
                       <span style={{ width: '7px', height: '7px', borderRadius: '2px', background: colors[idx % colors.length], flexShrink: 0 }} />
                       <span style={{ fontSize: '0.74rem', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{type}</span>
@@ -424,11 +454,11 @@ export function Overview({
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Code2 size={15} color="var(--text-primary)" />
               <h3 style={{ fontSize: '0.98rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
-                Indexed Tech Stack Matrix
+                Technologies
               </h3>
             </div>
             <span className="mono-stamp" style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-              {totalUniqueTech} Technologies
+              {totalUniqueTech} Indexed
             </span>
           </div>
 
@@ -441,7 +471,7 @@ export function Overview({
                     className="tag-cloud-pill"
                     onClick={() => onNavigate('projects')}
                     style={{ cursor: 'pointer' }}
-                    title={`Used in ${count} project(s) — click to browse`}
+                    title={`Used in ${count} project(s)`}
                   >
                     <span>{tag}</span>
                     <span className="tag-cloud-count">{count}</span>
@@ -449,27 +479,24 @@ export function Overview({
                 ))
               ) : (
                 <div style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
-                  No technology tags indexed yet.
+                  No technologies indexed yet.
                 </div>
               )}
-            </div>
-            <div style={{ marginTop: '12px', fontSize: '0.74rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
-              Click any technology pill to jump to the Projects catalog.
             </div>
           </div>
         </div>
 
       </section>
 
-      {/* 4. COMPACT RECENT LEDGERS (High-Density Tables — No long descriptive cards) */}
+      {/* 4. RECENT DIRECTORIES (3 CLEAN COLUMNS) */}
       <section className="dashboard-tables-grid">
         
-        {/* Compact Projects Table */}
+        {/* Recent Repositories */}
         <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
               <FolderGit2 size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
-              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
                 Recent Repositories
               </h3>
             </div>
@@ -484,56 +511,64 @@ export function Overview({
           </div>
 
           <div className="dashboard-mini-table">
-            {projects.slice(0, 4).map((project) => (
-              <div key={project.id} className="dashboard-mini-row">
-                <div className="dashboard-mini-info">
-                  <div className="dashboard-mini-title" title={project.title}>
-                    {project.title}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
-                    <span className="paper-stamp" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                      {project.category}
-                    </span>
-                    <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                      {project.status}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="dashboard-mini-actions">
-                  <button
-                    onClick={() => onOpenProjectModal(project)}
-                    className="paper-btn paper-btn-sm"
-                    style={{ fontSize: '0.72rem', padding: '3px 7px' }}
-                    title="View architecture specs"
-                  >
-                    Inspect
-                  </button>
-                  {project.repo_url && (
-                    <a
-                      href={project.repo_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="paper-btn paper-btn-icon"
-                      style={{ padding: '4px' }}
-                      title="GitHub Repository"
-                    >
-                      <GithubIcon size={12} />
-                    </a>
-                  )}
-                </div>
+            {recentProjects.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
+                No projects recorded.
               </div>
-            ))}
+            ) : (
+              recentProjects.map((project) => (
+                <div key={project.id} className="dashboard-mini-row">
+                  <div className="dashboard-mini-info">
+                    <div className="dashboard-mini-title" title={project.title}>
+                      {project.title}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
+                      {getProjectCategories(project).map((cat, idx) => (
+                        <span key={idx} className="paper-stamp" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
+                          {cat}
+                        </span>
+                      ))}
+                      <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
+                        {project.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="dashboard-mini-actions">
+                    <button
+                      onClick={() => onOpenProjectModal(project)}
+                      className="paper-btn paper-btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '3px 7px' }}
+                      title="Inspect specs"
+                    >
+                      Inspect
+                    </button>
+                    {project.repo_url && (
+                      <a
+                        href={project.repo_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="paper-btn paper-btn-icon"
+                        style={{ padding: '4px' }}
+                        title="GitHub"
+                      >
+                        <GithubIcon size={12} />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
-        {/* Compact Manuscripts Table */}
+        {/* Recent Manuscripts */}
         <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
               <FileText size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
-              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                Recent Vault Documents
+              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Recent Documents
               </h3>
             </div>
             <button 
@@ -547,34 +582,102 @@ export function Overview({
           </div>
 
           <div className="dashboard-mini-table">
-            {notes.slice(0, 4).map((note) => (
-              <div key={note.id} className="dashboard-mini-row">
-                <div className="dashboard-mini-info">
-                  <div className="dashboard-mini-title" title={note.title}>
-                    {note.title}
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
-                    <span className={`paper-stamp ${note.file_type === 'PDF' ? 'paper-stamp-red' : note.file_type === 'DOCX' ? 'paper-stamp-blue' : ''}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
-                      {note.file_type || 'DOC'}
-                    </span>
-                    <span className="mono-stamp" style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>
-                      {note.file_size}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="dashboard-mini-actions">
-                  <button
-                    onClick={() => onOpenNoteModal(note)}
-                    className="paper-btn paper-btn-sm"
-                    style={{ fontSize: '0.72rem', padding: '3px 7px' }}
-                    title="Open document viewer"
-                  >
-                    Open
-                  </button>
-                </div>
+            {recentNotes.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
+                No documents in vault.
               </div>
-            ))}
+            ) : (
+              recentNotes.map((note) => (
+                <div key={note.id} className="dashboard-mini-row">
+                  <div className="dashboard-mini-info">
+                    <div className="dashboard-mini-title" title={note.title}>
+                      {note.title}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
+                      <span className={`paper-stamp ${note.file_type === 'PDF' ? 'paper-stamp-red' : note.file_type === 'DOCX' ? 'paper-stamp-blue' : ''}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
+                        {note.file_type || 'DOC'}
+                      </span>
+                      <span className="mono-stamp" style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>
+                        {note.file_size}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="dashboard-mini-actions">
+                    <button
+                      onClick={() => onOpenNoteModal(note)}
+                      className="paper-btn paper-btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '3px 7px' }}
+                      title="Open viewer"
+                    >
+                      Open
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Recent Documentation */}
+        <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+              <BookOpen size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
+              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Documentation
+              </h3>
+            </div>
+            <button 
+              onClick={() => onNavigate('docs')}
+              className="paper-btn paper-btn-sm"
+              style={{ fontSize: '0.72rem', padding: '3px 7px', flexShrink: 0 }}
+            >
+              <span>View All</span>
+              <ArrowRight size={11} />
+            </button>
+          </div>
+
+          <div className="dashboard-mini-table">
+            {recentDocs.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.8rem' }}>
+                No documentation articles.
+              </div>
+            ) : (
+              recentDocs.map((doc) => {
+                const words = doc.content ? doc.content.split(/\s+/).length : 0;
+                const readingTime = Math.max(1, Math.round(words / 200));
+                return (
+                  <div key={doc.id} className="dashboard-mini-row">
+                    <div className="dashboard-mini-info">
+                      <div className="dashboard-mini-title" title={doc.title}>
+                        {doc.title}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
+                        <span className="paper-stamp paper-stamp-blue" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
+                          {doc.category || 'General'}
+                        </span>
+                        <span className="mono-stamp" style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Clock size={10} />
+                          ~{readingTime}m
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="dashboard-mini-actions">
+                      <button
+                        onClick={() => handleReadDoc(doc)}
+                        className="paper-btn paper-btn-sm"
+                        style={{ fontSize: '0.72rem', padding: '3px 7px' }}
+                        title="Read document"
+                      >
+                        Read
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
 

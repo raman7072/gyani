@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
 import { GithubIcon } from './GithubIcon';
+import { getProjectCategories } from '../services/supabase';
 
 export function ProjectDetailsModal({ project, onClose }) {
   const [copied, setCopied] = React.useState(false);
@@ -31,10 +32,12 @@ export function ProjectDetailsModal({ project, onClose }) {
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '18px', gap: '16px' }}>
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-              <span className="paper-stamp">
-                {project.category}
-              </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px', flexWrap: 'wrap' }}>
+              {getProjectCategories(project).map((cat, idx) => (
+                <span key={idx} className="paper-stamp">
+                  {cat}
+                </span>
+              ))}
               <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`}>
                 {project.status}
               </span>
@@ -108,14 +111,16 @@ export function ProjectDetailsModal({ project, onClose }) {
         </div>
 
         {/* Overview Description */}
-        <div style={{ marginBottom: '20px' }}>
-          <div className="mono-stamp" style={{ color: 'var(--text-tertiary)', marginBottom: '6px' }}>
-            PROJECT OVERVIEW
+        {project.description && (
+          <div style={{ marginBottom: '20px' }}>
+            <div className="mono-stamp" style={{ color: 'var(--text-tertiary)', marginBottom: '6px' }}>
+              PROJECT OVERVIEW
+            </div>
+            <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.65, fontFamily: 'var(--font-serif)' }}>
+              {project.description}
+            </p>
           </div>
-          <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', lineHeight: 1.65, fontFamily: 'var(--font-serif)' }}>
-            {project.description}
-          </p>
-        </div>
+        )}
 
         {/* Architecture & Engineering Decisions */}
         {project.architecture_notes && (
@@ -140,18 +145,20 @@ export function ProjectDetailsModal({ project, onClose }) {
         )}
 
         {/* Tech Stack Chips */}
-        <div style={{ marginBottom: '20px' }}>
-          <div className="mono-stamp" style={{ color: 'var(--text-tertiary)', marginBottom: '8px' }}>
-            TECHNOLOGIES & STACK
+        {project.tags && project.tags.length > 0 && (
+          <div style={{ marginBottom: '20px' }}>
+            <div className="mono-stamp" style={{ color: 'var(--text-tertiary)', marginBottom: '8px' }}>
+              TECHNOLOGIES & STACK
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {project.tags.map((tag) => (
+                <span key={tag} className="paper-stamp">
+                  {tag}
+                </span>
+              ))}
+            </div>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-            {project.tags?.map((tag) => (
-              <span key={tag} className="paper-stamp">
-                {tag}
-              </span>
-            ))}
-          </div>
-        </div>
+        )}
 
         {/* Footer */}
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '16px' }}>

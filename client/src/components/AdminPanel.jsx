@@ -8,7 +8,6 @@ import {
   Save, 
   Upload, 
   Database, 
-  Key, 
   Check, 
   Copy, 
   FolderGit2, 
@@ -24,7 +23,8 @@ import {
   updateSupabaseCredentials, 
   clearSupabaseCredentials, 
   SUPABASE_SCHEMA_SQL,
-  supabase 
+  supabase,
+  getProjectCategories 
 } from '../services/supabase';
 import { GyaniLogo } from './GyaniLogo';
 
@@ -52,6 +52,112 @@ export function AdminPanel({
   const [editingProject, setEditingProject] = useState(null);
   const [editingNote, setEditingNote] = useState(null);
   const [editingDoc, setEditingDoc] = useState(null);
+
+  // Category management for Projects (custom and multiple categories)
+  const DEFAULT_CATEGORIES = [
+    'Full-Stack',
+    'Backend / Systems',
+    'Frontend / UI',
+    'AI / Machine Learning',
+    'Systems / Low-Level',
+    'DevOps & Cloud',
+    'Data Engineering',
+    'Mobile Development',
+    'Distributed Systems',
+    'Security & Cryptography',
+    'Open Source Tooling'
+  ];
+
+  const [projectCategories, setProjectCategories] = useState(['Full-Stack']);
+  const [newCategoryInput, setNewCategoryInput] = useState('');
+  const [customCategoriesList, setCustomCategoriesList] = useState(() => {
+    try {
+      const stored = localStorage.getItem('gyani_custom_project_categories');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const allAvailableCategories = React.useMemo(() => {
+    const set = new Set([...DEFAULT_CATEGORIES, ...customCategoriesList]);
+    if (projects) {
+      projects.forEach(p => {
+        getProjectCategories(p).forEach(c => set.add(c));
+      });
+    }
+    return Array.from(set);
+  }, [projects, customCategoriesList]);
+
+  const handleStartNewProject = () => {
+    setEditingProject({
+      title: '',
+      description: '',
+      category: 'Full-Stack',
+      status: 'In Progress',
+      progress: 50,
+      repo_url: '',
+      demo_url: '',
+      architecture_notes: '',
+      tags: []
+    });
+    setProjectCategories(['Full-Stack']);
+    setNewCategoryInput('');
+  };
+
+  const handleStartEditProject = (proj) => {
+    setEditingProject(proj);
+    setProjectCategories(getProjectCategories(proj));
+    setNewCategoryInput('');
+  };
+
+  const handleToggleCategory = (cat) => {
+    setProjectCategories(prev => {
+      if (prev.includes(cat)) {
+        return prev.filter(c => c !== cat);
+      } else {
+        return [...prev, cat];
+      }
+    });
+  };
+
+  const handleRemoveCategory = (cat) => {
+    setProjectCategories(prev => prev.filter(c => c !== cat));
+  };
+
+  const handleAddCustomCategory = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = newCategoryInput.trim();
+    if (!trimmed) return;
+
+    if (!projectCategories.includes(trimmed)) {
+      setProjectCategories(prev => [...prev, trimmed]);
+    }
+
+    if (!customCategoriesList.includes(trimmed) && !DEFAULT_CATEGORIES.includes(trimmed)) {
+      const updated = [...customCategoriesList, trimmed];
+      setCustomCategoriesList(updated);
+      try {
+        localStorage.setItem('gyani_custom_project_categories', JSON.stringify(updated));
+      } catch (err) {
+        console.warn('Could not save custom category to localStorage', err);
+      }
+    }
+
+    setNewCategoryInput('');
+  };
+
+  const handleDeleteCustomCategoryFromPool = (e, cat) => {
+    e.stopPropagation();
+    const updated = customCategoriesList.filter(c => c !== cat);
+    setCustomCategoriesList(updated);
+    try {
+      localStorage.setItem('gyani_custom_project_categories', JSON.stringify(updated));
+    } catch (err) {
+      console.warn('Could not update custom categories in localStorage', err);
+    }
+    setProjectCategories(prev => prev.filter(c => c !== cat));
+  };
 
   const [customUrl, setCustomUrl] = useState(localStorage.getItem('custom_supabase_url') || import.meta.env.VITE_SUPABASE_URL || '');
   const [customKey, setCustomKey] = useState(localStorage.getItem('custom_supabase_key') || import.meta.env.VITE_SUPABASE_ANON_KEY || '');
@@ -148,17 +254,19 @@ export function AdminPanel({
   const handleSaveProject = async (e) => {
     e.preventDefault();
     const form = e.target;
+    const finalCategories = projectCategories.length > 0 ? projectCategories : ['Full-Stack'];
     const projectData = {
       ...editingProject,
       title: form.title.value.trim(),
-      description: form.description.value.trim(),
-      category: form.category.value,
+      description: form.description?.value?.trim() || '',
+      category: finalCategories.join(', '),
+      categories: finalCategories,
       status: form.status.value,
       progress: parseInt(form.progress.value, 10) || 100,
-      repo_url: form.repo_url.value.trim(),
-      demo_url: form.demo_url.value.trim(),
-      architecture_notes: form.architecture_notes.value.trim(),
-      tags: form.tags.value.split(',').map(t => t.trim()).filter(Boolean)
+      repo_url: form.repo_url?.value?.trim() || '',
+      demo_url: form.demo_url?.value?.trim() || '',
+      architecture_notes: form.architecture_notes?.value?.trim() || '',
+      tags: form.tags?.value ? form.tags.value.split(',').map(t => t.trim()).filter(Boolean) : []
     };
 
     try {
@@ -191,14 +299,14 @@ export function AdminPanel({
     const form = e.target;
     const noteData = {
       ...editingNote,
-      title: form.title.value.trim(),
-      description: form.description.value.trim(),
-      file_name: form.file_name.value.trim(),
-      file_size: form.file_size.value.trim() || '1.2 MB',
-      file_type: form.file_type.value,
-      category: form.category.value,
-      preview_content: form.preview_content.value,
-      tags: form.tags.value.split(',').map(t => t.trim()).filter(Boolean)
+      title: form.title?.value?.trim() || editingNote?.file_name || 'Untitled Document',
+      description: form.description?.value?.trim() || '',
+      file_name: form.file_name?.value?.trim() || editingNote?.file_name || 'document',
+      file_size: form.file_size?.value?.trim() || editingNote?.file_size || 'Unknown',
+      file_type: form.file_type?.value || editingNote?.file_type || 'PDF',
+      category: form.category?.value?.trim() || editingNote?.category || 'General',
+      preview_content: form.preview_content?.value || editingNote?.preview_content || '',
+      tags: form.tags?.value ? form.tags.value.split(',').map(t => t.trim()).filter(Boolean) : (editingNote?.tags || [])
     };
 
     try {
@@ -230,20 +338,36 @@ export function AdminPanel({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Immediately format size: KB or MB
+    const formattedSize = file.size < 1024 * 1024 
+      ? (file.size / 1024).toFixed(1) + ' KB' 
+      : (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+    const inferredExt = (file.name.split('.').pop() || '').toUpperCase();
+    const cleanTitle = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]+/g, ' ').trim();
+
+    // Immediately populate state so user sees filename and size instantly
+    setEditingNote(prev => ({
+      ...prev,
+      title: prev?.title ? prev.title : cleanTitle,
+      file_name: file.name,
+      file_size: formattedSize,
+      file_type: ['PDF', 'DOCX', 'MARKDOWN', 'CODE'].includes(inferredExt) ? inferredExt : (inferredExt === 'MD' ? 'MARKDOWN' : 'OTHER')
+    }));
+
     try {
       setIsSubmitting(true);
       const uploaded = await api.uploadFile(file);
       setEditingNote(prev => ({
         ...prev,
-        file_name: uploaded.name,
-        file_size: uploaded.size,
+        file_name: uploaded.name || file.name,
+        file_size: uploaded.size || formattedSize,
         file_url: uploaded.url,
-        file_type: file.name.split('.').pop().toUpperCase(),
         preview_content: uploaded.content || prev?.preview_content || ''
       }));
-      showNotification('File stored in Supabase "documents" bucket!');
+      showNotification(`File "${file.name}" (${formattedSize}) loaded into storage!`);
     } catch (err) {
-      alert('Upload error: ' + err.message);
+      console.warn('Upload error:', err);
+      showNotification(`File metadata "${file.name}" (${formattedSize}) captured.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -252,13 +376,25 @@ export function AdminPanel({
   const handleSaveDoc = async (e) => {
     e.preventDefault();
     const form = e.target;
+
+    // Automatic index calculation: preserve existing index or auto-assign next sequence integer
+    const autoOrderIndex = editingDoc?.id && editingDoc?.order_index
+      ? Number(editingDoc.order_index)
+      : (docs.length > 0 ? Math.max(...docs.map(d => Number(d.order_index) || 0)) + 1 : 1);
+
+    const titleVal = form.title.value.trim();
+    const rawSlug = form.slug?.value?.trim() || '';
+    const slugVal = rawSlug
+      ? rawSlug.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/(^-|-$)/g, '')
+      : titleVal.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/(^-|-$)/g, '') || `doc-${autoOrderIndex}`;
+
     const docData = {
       ...editingDoc,
-      title: form.title.value.trim(),
-      slug: form.slug.value.trim().toLowerCase().replace(/\s+/g, '-'),
-      category: form.category.value,
-      order_index: parseInt(form.order_index.value, 10) || 1,
-      summary: form.summary.value.trim(),
+      title: titleVal,
+      slug: slugVal,
+      category: form.category.value.trim() || 'General',
+      order_index: autoOrderIndex,
+      summary: form.summary?.value?.trim() || '',
       content: form.content.value
     };
 
@@ -266,7 +402,7 @@ export function AdminPanel({
       setIsSubmitting(true);
       await api.saveDoc(docData);
       setEditingDoc(null);
-      showNotification('Documentation article saved to Supabase!');
+      showNotification(`Documentation article #${autoOrderIndex} saved to Supabase!`);
       onRefreshData();
     } catch (err) {
       alert('Error saving document to Supabase: ' + (err.message || err));
@@ -542,17 +678,7 @@ export function AdminPanel({
                         Projects Directory Register
                       </h3>
                       <button
-                        onClick={() => setEditingProject({
-                          title: '',
-                          description: '',
-                          category: 'Full-Stack',
-                          status: 'In Progress',
-                          progress: 50,
-                          repo_url: '',
-                          demo_url: '',
-                          architecture_notes: '',
-                          tags: []
-                        })}
+                        onClick={handleStartNewProject}
                         className="paper-btn paper-btn-primary paper-btn-sm"
                       >
                         <Plus size={14} />
@@ -570,16 +696,20 @@ export function AdminPanel({
                             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: 'var(--text-primary)', fontFamily: 'var(--font-serif)' }}>
                               {proj.title}
                             </div>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
-                              <span className="paper-stamp" style={{ padding: '1px 6px', fontSize: '0.68rem' }}>{proj.category}</span>
-                              {' • '}{proj.status} ({proj.progress}%)
-                              {proj.repo_url && ` • GitHub: ${proj.repo_url}`}
+                            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
+                              {getProjectCategories(proj).map((cat, idx) => (
+                                <span key={idx} className="paper-stamp" style={{ padding: '1px 6px', fontSize: '0.68rem' }}>
+                                  {cat}
+                                </span>
+                              ))}
+                              <span>• {proj.status} ({proj.progress}%)</span>
+                              {proj.repo_url && <span>• GitHub: {proj.repo_url}</span>}
                             </div>
                           </div>
 
                           <div style={{ display: 'flex', gap: '6px' }}>
                             <button
-                              onClick={() => setEditingProject(proj)}
+                              onClick={() => handleStartEditProject(proj)}
                               className="paper-btn paper-btn-sm"
                             >
                               <Edit3 size={13} />
@@ -603,8 +733,9 @@ export function AdminPanel({
                       {editingProject.id ? 'Edit Project Entry' : 'Create New Project Entry'}
                     </h3>
 
+                    {/* Basic Info Fields */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '14px', marginBottom: '14px' }}>
-                      <div>
+                      <div style={{ gridColumn: '1 / -1' }}>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                           PROJECT TITLE
                         </label>
@@ -612,22 +743,9 @@ export function AdminPanel({
                           name="title"
                           defaultValue={editingProject.title}
                           className="paper-input"
+                          placeholder="e.g. Distributed Consensus Engine"
                           required
                         />
-                      </div>
-
-                      <div>
-                        <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          CATEGORY
-                        </label>
-                        <select name="category" defaultValue={editingProject.category || 'Full-Stack'} className="paper-input">
-                          <option value="Backend / Systems">Backend / Systems</option>
-                          <option value="Frontend / UI">Frontend / UI</option>
-                          <option value="AI / Machine Learning">AI / Machine Learning</option>
-                          <option value="Systems / Low-Level">Systems / Low-Level</option>
-                          <option value="Full-Stack">Full-Stack</option>
-                          <option value="DevOps & Cloud">DevOps & Cloud</option>
-                        </select>
                       </div>
 
                       <div>
@@ -683,39 +801,173 @@ export function AdminPanel({
                       </div>
                     </div>
 
+                    {/* CATEGORIES SECTION (MULTIPLE & CUSTOM CATEGORIES) */}
+                    <div className="paper-panel" style={{ padding: '16px', marginBottom: '16px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '6px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap', gap: '8px' }}>
+                        <div>
+                          <label style={{ fontSize: '0.78rem', fontFamily: 'var(--font-mono)', color: 'var(--text-primary)', fontWeight: 600, display: 'block' }}>
+                            PROJECT CATEGORIES (MULTIPLE & CUSTOM)
+                          </label>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                            Assign multiple categories or create custom categories for your system
+                          </span>
+                        </div>
+                        <span className="paper-stamp paper-stamp-active" style={{ fontSize: '0.7rem' }}>
+                          {projectCategories.length} Selected
+                        </span>
+                      </div>
+
+                      {/* Active selected categories chips */}
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', minHeight: '38px', alignItems: 'center', marginBottom: '12px', padding: '8px 10px', background: 'var(--bg-card)', borderRadius: '4px', border: '1px dashed var(--border-color)' }}>
+                        {projectCategories.length === 0 ? (
+                          <span style={{ fontSize: '0.78rem', color: 'var(--accent-stamp)', fontStyle: 'italic' }}>
+                            No category selected. Please select from below or add a custom category.
+                          </span>
+                        ) : (
+                          projectCategories.map((cat) => (
+                            <span 
+                              key={cat} 
+                              className="paper-stamp paper-stamp-active"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 9px', fontSize: '0.76rem' }}
+                            >
+                              <span>{cat}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveCategory(cat)}
+                                style={{
+                                  background: 'none',
+                                  border: 'none',
+                                  color: 'inherit',
+                                  cursor: 'pointer',
+                                  padding: '0 2px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  opacity: 0.85
+                                }}
+                                title={`Remove ${cat}`}
+                              >
+                                <X size={12} />
+                              </button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+
+                      {/* Custom category entry input */}
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                        <input
+                          type="text"
+                          value={newCategoryInput}
+                          onChange={(e) => setNewCategoryInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddCustomCategory(e);
+                            }
+                          }}
+                          placeholder="Type custom category name (e.g. Robotics, Cryptography, Compilers)..."
+                          className="paper-input"
+                          style={{ flex: '1 1 240px', fontSize: '0.85rem', padding: '7px 11px' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCustomCategory}
+                          className="paper-btn paper-btn-sm"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '7px 14px' }}
+                        >
+                          <Plus size={13} />
+                          <span>Add Category</span>
+                        </button>
+                      </div>
+
+                      {/* Available categories quick toggle cloud */}
+                      <div>
+                        <div style={{ fontSize: '0.68rem', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                          SUGGESTED & CATALOGED CATEGORIES (CLICK TO TOGGLE):
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', maxHeight: '120px', overflowY: 'auto' }}>
+                          {allAvailableCategories.map((cat) => {
+                            const isSelected = projectCategories.includes(cat);
+                            const isCustom = customCategoriesList.includes(cat);
+                            return (
+                              <span
+                                key={cat}
+                                onClick={() => handleToggleCategory(cat)}
+                                className={`paper-stamp ${isSelected ? 'paper-stamp-active' : ''}`}
+                                style={{
+                                  cursor: 'pointer',
+                                  fontSize: '0.72rem',
+                                  padding: '3px 8px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px',
+                                  userSelect: 'none'
+                                }}
+                                title={isSelected ? `Click to deselect ${cat}` : `Click to select ${cat}`}
+                              >
+                                {isSelected ? <Check size={11} /> : <Plus size={11} />}
+                                <span>{cat}</span>
+                                {isCustom && !isSelected && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleDeleteCustomCategoryFromPool(e, cat)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      color: 'var(--accent-stamp)',
+                                      cursor: 'pointer',
+                                      padding: '0 2px',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      marginLeft: '3px'
+                                    }}
+                                    title={`Delete custom category "${cat}" from saved pool`}
+                                  >
+                                    <X size={11} />
+                                  </button>
+                                )}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
                     <div style={{ marginBottom: '14px' }}>
                       <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        DESCRIPTION
+                        DESCRIPTION (OPTIONAL)
                       </label>
                       <textarea
                         name="description"
                         defaultValue={editingProject.description}
                         className="paper-input"
                         style={{ minHeight: '70px' }}
-                        required
+                        placeholder="Optional project abstract or overview..."
                       />
                     </div>
 
                     <div style={{ marginBottom: '14px' }}>
                       <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        ARCHITECTURE & ENGINEERING NOTES
+                        ARCHITECTURE & ENGINEERING NOTES (OPTIONAL)
                       </label>
                       <textarea
                         name="architecture_notes"
                         defaultValue={editingProject.architecture_notes}
                         className="paper-input"
                         style={{ minHeight: '70px' }}
+                        placeholder="Optional architectural patterns, engineering trade-offs, and technical notes..."
                       />
                     </div>
 
                     <div style={{ marginBottom: '20px' }}>
                       <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        TAGS (COMMA SEPARATED)
+                        TAGS (COMMA SEPARATED, OPTIONAL)
                       </label>
                       <input
                         name="tags"
                         defaultValue={editingProject.tags?.join(', ')}
                         className="paper-input"
+                        placeholder="e.g. distributed-systems, raft, rust, webassembly"
                       />
                     </div>
 
@@ -753,8 +1005,8 @@ export function AdminPanel({
                         onClick={() => setEditingNote({
                           title: '',
                           description: '',
-                          file_name: 'manuscript.pdf',
-                          file_size: '1.2 MB',
+                          file_name: '',
+                          file_size: '',
                           file_type: 'PDF',
                           category: 'Databases',
                           preview_content: '',
@@ -822,13 +1074,21 @@ export function AdminPanel({
                         Select Document (PDF, DOCX, Markdown, etc.)
                       </div>
                       <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginBottom: '10px' }}>
-                        Stored in Supabase Storage bucket <code>documents</code>
+                        Filename and file size are automatically captured on selection
                       </div>
                       <input
                         type="file"
                         onChange={handleFileUpload}
                         style={{ fontSize: '0.8rem' }}
                       />
+                      {editingNote.file_name && (
+                        <div style={{ marginTop: '8px', fontSize: '0.76rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+                          <span className="paper-stamp paper-stamp-active" style={{ fontSize: '0.7rem' }}>
+                            {editingNote.file_name}
+                          </span>
+                          <span>• {editingNote.file_size || 'Auto-detected'}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', gap: '14px', marginBottom: '14px' }}>
@@ -838,7 +1098,9 @@ export function AdminPanel({
                         </label>
                         <input
                           name="title"
-                          defaultValue={editingNote.title}
+                          value={editingNote.title || ''}
+                          onChange={(e) => setEditingNote(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="Document title..."
                           className="paper-input"
                           required
                         />
@@ -846,13 +1108,14 @@ export function AdminPanel({
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          FILENAME
+                          FILENAME (AUTO-DETECTED)
                         </label>
                         <input
                           name="file_name"
-                          defaultValue={editingNote.file_name}
+                          value={editingNote.file_name || ''}
+                          onChange={(e) => setEditingNote(prev => ({ ...prev, file_name: e.target.value }))}
+                          placeholder="Auto-detected from file..."
                           className="paper-input"
-                          required
                         />
                       </div>
 
@@ -860,7 +1123,12 @@ export function AdminPanel({
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
                           FORMAT
                         </label>
-                        <select name="file_type" defaultValue={editingNote.file_type || 'PDF'} className="paper-input">
+                        <select 
+                          name="file_type" 
+                          value={editingNote.file_type || 'PDF'} 
+                          onChange={(e) => setEditingNote(prev => ({ ...prev, file_type: e.target.value }))}
+                          className="paper-input"
+                        >
                           <option value="PDF">PDF</option>
                           <option value="DOCX">DOCX</option>
                           <option value="MARKDOWN">MARKDOWN</option>
@@ -871,60 +1139,81 @@ export function AdminPanel({
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          FILE SIZE
+                          FILE SIZE (AUTO-DETECTED)
                         </label>
                         <input
                           name="file_size"
-                          defaultValue={editingNote.file_size}
+                          value={editingNote.file_size || ''}
+                          onChange={(e) => setEditingNote(prev => ({ ...prev, file_size: e.target.value }))}
+                          placeholder="Auto-detected size..."
                           className="paper-input"
                         />
                       </div>
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          CATEGORY
+                          CATEGORY (CUSTOM OR PRESET)
                         </label>
                         <input
                           name="category"
-                          defaultValue={editingNote.category || 'System Design'}
+                          value={editingNote.category || 'System Design'}
+                          onChange={(e) => setEditingNote(prev => ({ ...prev, category: e.target.value }))}
                           className="paper-input"
+                          list="note-categories-datalist"
+                          placeholder="Select or type custom category..."
                         />
+                        <datalist id="note-categories-datalist">
+                          <option value="System Design" />
+                          <option value="Databases" />
+                          <option value="Distributed Systems" />
+                          <option value="Algorithms" />
+                          <option value="Networking" />
+                          <option value="Cloud Architecture" />
+                          <option value="Security" />
+                          <option value="Performance" />
+                          <option value="Machine Learning" />
+                        </datalist>
                       </div>
                     </div>
 
                     <div style={{ marginBottom: '14px' }}>
                       <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        SUMMARY
+                        SUMMARY (OPTIONAL)
                       </label>
                       <textarea
                         name="description"
-                        defaultValue={editingNote.description}
+                        value={editingNote.description || ''}
+                        onChange={(e) => setEditingNote(prev => ({ ...prev, description: e.target.value }))}
                         className="paper-input"
                         style={{ minHeight: '65px' }}
-                        required
+                        placeholder="Optional brief summary or abstract..."
                       />
                     </div>
 
                     <div style={{ marginBottom: '14px' }}>
                       <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        READER EXTRACT / MARKDOWN PREVIEW
+                        READER EXTRACT / MARKDOWN PREVIEW (OPTIONAL)
                       </label>
                       <textarea
                         name="preview_content"
-                        defaultValue={editingNote.preview_content}
+                        value={editingNote.preview_content || ''}
+                        onChange={(e) => setEditingNote(prev => ({ ...prev, preview_content: e.target.value }))}
                         className="paper-input"
                         style={{ minHeight: '120px', fontFamily: 'var(--font-mono)', fontSize: '0.825rem' }}
+                        placeholder="Optional inline markdown or extracted preview text..."
                       />
                     </div>
 
                     <div style={{ marginBottom: '20px' }}>
                       <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                        TAGS (COMMA SEPARATED)
+                        TAGS (COMMA SEPARATED, OPTIONAL)
                       </label>
                       <input
                         name="tags"
-                        defaultValue={editingNote.tags?.join(', ')}
+                        value={Array.isArray(editingNote.tags) ? editingNote.tags.join(', ') : (editingNote.tags || '')}
+                        onChange={(e) => setEditingNote(prev => ({ ...prev, tags: e.target.value.split(',').map(t => t.trim()) }))}
                         className="paper-input"
+                        placeholder="e.g. system-design, storage, databases"
                       />
                     </div>
 
@@ -959,14 +1248,17 @@ export function AdminPanel({
                         Documentation Monograph Register
                       </h3>
                       <button
-                        onClick={() => setEditingDoc({
-                          title: '',
-                          slug: 'new-monograph',
-                          category: 'Getting Started',
-                          order_index: docs.length + 1,
-                          summary: '',
-                          content: `# Topic Title\n\nWrite your technical documentation here...\n\n## Section 1\n\n\`\`\`javascript\nconsole.log('Paper & Ink Docs');\n\`\`\``
-                        })}
+                        onClick={() => {
+                          const nextOrderIndex = docs.length > 0 ? Math.max(...docs.map(d => Number(d.order_index) || 0)) + 1 : 1;
+                          setEditingDoc({
+                            title: '',
+                            slug: '',
+                            category: 'Getting Started',
+                            order_index: nextOrderIndex,
+                            summary: '',
+                            content: `# Topic Title\n\nWrite your technical documentation here...\n\n## Section 1\n\n\`\`\`javascript\nconsole.log('Gyani Technical Docs');\n\`\`\``
+                          });
+                        }}
                         className="paper-btn paper-btn-primary paper-btn-sm"
                       >
                         <Plus size={14} />
@@ -1031,37 +1323,59 @@ export function AdminPanel({
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          SLUG
+                          SLUG (OPTIONAL)
                         </label>
                         <input
                           name="slug"
                           defaultValue={editingDoc.slug}
+                          placeholder="Auto-generated from title if blank..."
                           className="paper-input"
-                          required
                         />
                       </div>
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          CATEGORY
+                          CATEGORY (CUSTOM OR PRESET)
                         </label>
                         <input
                           name="category"
-                          defaultValue={editingDoc.category || 'System Design'}
+                          defaultValue={editingDoc.category || 'Architecture'}
                           className="paper-input"
+                          list="doc-categories-datalist"
+                          placeholder="Select or type custom category..."
                         />
+                        <datalist id="doc-categories-datalist">
+                          <option value="Architecture" />
+                          <option value="Getting Started" />
+                          <option value="Guides" />
+                          <option value="API Reference" />
+                          <option value="Deep Dive" />
+                          <option value="Design Patterns" />
+                          <option value="Infrastructure" />
+                          <option value="Best Practices" />
+                        </datalist>
                       </div>
 
                       <div>
                         <label style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', display: 'block', marginBottom: '4px' }}>
-                          ORDER INDEX
+                          ORDER INDEX (AUTOMATIC)
                         </label>
-                        <input
-                          name="order_index"
-                          type="number"
-                          defaultValue={editingDoc.order_index || 1}
-                          className="paper-input"
-                        />
+                        <div style={{
+                          padding: '7px 11px',
+                          background: 'var(--bg-card)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px'
+                        }}>
+                          <span className="paper-stamp paper-stamp-active" style={{ fontSize: '0.7rem' }}>
+                            #{editingDoc.order_index || (docs.length > 0 ? Math.max(...docs.map(d => Number(d.order_index) || 0)) + 1 : 1)}
+                          </span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                            {editingDoc.id ? 'Preserved' : 'Auto-assigned in sequence'}
+                          </span>
+                        </div>
                       </div>
                     </div>
 

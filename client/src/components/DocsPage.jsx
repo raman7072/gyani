@@ -447,25 +447,13 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
       <div className="docs-index-layout">
         {/* Page Header */}
         <div className="page-header" style={{ marginBottom: '4px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-            <span className="paper-stamp paper-stamp-active">
-              DOCUMENTATION
-            </span>
-            <span className="paper-stamp">
-              SYSTEM ARCHITECTURE & MANUALS
-            </span>
-            <span className="paper-stamp paper-stamp-sage">
-              CATALOG INDEX
-            </span>
-          </div>
-          
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
             <div>
               <h1 style={{ fontSize: 'clamp(2.1rem, 4vw, 2.9rem)', marginBottom: '8px' }}>
-                Documentation & Wiki
+                Documentation
               </h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', maxWidth: '680px', fontFamily: 'var(--font-serif)' }}>
-                System specifications, engineering blueprints, and in-depth monographs. Search topics or browse by domain to inspect technical manuals.
+                System specifications, engineering blueprints, and technical monographs.
               </p>
             </div>
 

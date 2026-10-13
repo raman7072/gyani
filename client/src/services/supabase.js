@@ -5,11 +5,14 @@ const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_oTiygcwZSzQiML6o5pgiyQ_vrXN7Gx
 
 // Default Supabase config from local storage override, Vite env vars, or production defaults
 const getEnvConfig = () => {
-  const localUrl = localStorage.getItem('custom_supabase_url');
-  const localKey = localStorage.getItem('custom_supabase_key');
+  const localUrl = typeof localStorage !== 'undefined' ? localStorage.getItem('custom_supabase_url') : null;
+  const localKey = typeof localStorage !== 'undefined' ? localStorage.getItem('custom_supabase_key') : null;
 
-  const supabaseUrl = localUrl || import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-  const supabaseAnonKey = localKey || import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
+  const envUrl = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_SUPABASE_URL : null;
+  const envKey = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.VITE_SUPABASE_ANON_KEY : null;
+
+  const supabaseUrl = localUrl || envUrl || DEFAULT_SUPABASE_URL;
+  const supabaseAnonKey = localKey || envKey || DEFAULT_SUPABASE_ANON_KEY;
 
   return { supabaseUrl, supabaseAnonKey };
 };
@@ -42,19 +45,23 @@ export const getSupabaseClient = () => {
 export let supabase = getSupabaseClient();
 
 export const updateSupabaseCredentials = (url, key) => {
-  if (url && key) {
-    localStorage.setItem('custom_supabase_url', url.trim());
-    localStorage.setItem('custom_supabase_key', key.trim());
-  } else {
-    localStorage.removeItem('custom_supabase_url');
-    localStorage.removeItem('custom_supabase_key');
+  if (typeof localStorage !== 'undefined') {
+    if (url && key) {
+      localStorage.setItem('custom_supabase_url', url.trim());
+      localStorage.setItem('custom_supabase_key', key.trim());
+    } else {
+      localStorage.removeItem('custom_supabase_url');
+      localStorage.removeItem('custom_supabase_key');
+    }
   }
   supabase = getSupabaseClient();
 };
 
 export const clearSupabaseCredentials = () => {
-  localStorage.removeItem('custom_supabase_url');
-  localStorage.removeItem('custom_supabase_key');
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('custom_supabase_url');
+    localStorage.removeItem('custom_supabase_key');
+  }
   supabase = getSupabaseClient();
 };
 
@@ -67,8 +74,27 @@ export const INITIAL_PROJECTS = [];
 export const INITIAL_NOTES = [];
 export const INITIAL_DOCS = [];
 
+// Helper to extract clean array of categories from project object
+export const getProjectCategories = (project) => {
+  if (!project) return ['Full-Stack'];
+  if (Array.isArray(project.categories) && project.categories.length > 0) {
+    const valid = project.categories.filter(c => typeof c === 'string' && c.trim());
+    if (valid.length > 0) return valid;
+  }
+  if (typeof project.category === 'string' && project.category.trim()) {
+    const list = project.category.split(',').map(c => c.trim()).filter(Boolean);
+    return list.length > 0 ? list : [project.category.trim()];
+  }
+  if (Array.isArray(project.category) && project.category.length > 0) {
+    const valid = project.category.filter(c => typeof c === 'string' && c.trim());
+    if (valid.length > 0) return valid;
+  }
+  return ['Full-Stack'];
+};
+
 // Helper to get local storage items or fallback
 const getLocalData = (key, fallback) => {
+  if (typeof localStorage === 'undefined') return fallback;
   try {
     // Clear old aethervault key if present
     localStorage.removeItem(`aethervault_${key}`);
@@ -89,6 +115,7 @@ const getLocalData = (key, fallback) => {
 };
 
 const saveLocalData = (key, data) => {
+  if (typeof localStorage === 'undefined') return;
   try {
     localStorage.setItem(`gyani_${key}`, JSON.stringify(data));
   } catch (err) {
@@ -103,6 +130,7 @@ const saveLocalData = (key, data) => {
 export const api = {
   // PROJECTS
   async getProjects() {
+    let list = [];
     if (isSupabaseConfigured() && supabase) {
       try {
         const { data, error } = await supabase
@@ -111,18 +139,29 @@ export const api = {
           .order('created_at', { ascending: false });
         if (!error && data) {
           saveLocalData('projects', data);
-          return data;
+          list = data;
+        } else {
+          if (error) console.warn('Supabase fetch projects error:', error.message);
+          list = getLocalData('projects', INITIAL_PROJECTS);
         }
-        if (error) console.warn('Supabase fetch projects error:', error.message);
       } catch (e) {
         console.warn('Supabase fetch projects exception:', e);
+        list = getLocalData('projects', INITIAL_PROJECTS);
       }
+    } else {
+      list = getLocalData('projects', INITIAL_PROJECTS);
     }
-    return getLocalData('projects', INITIAL_PROJECTS);
+    return (list || []).map(p => ({
+      ...p,
+      categories: getProjectCategories(p)
+    }));
   },
 
   async saveProject(project) {
     let result = null;
+    const categoriesArray = getProjectCategories(project);
+    const categoryString = categoriesArray.join(', ');
+
     if (isSupabaseConfigured() && supabase) {
       try {
         if (project.id && !project.id.startsWith('temp-') && !project.id.startsWith('proj-')) {
@@ -131,7 +170,7 @@ export const api = {
             .update({
               title: project.title,
               description: project.description,
-              category: project.category,
+              category: categoryString,
               status: project.status,
               progress: project.progress,
               repo_url: project.repo_url,
@@ -155,7 +194,7 @@ export const api = {
             .insert([{
               title: toInsert.title,
               description: toInsert.description,
-              category: toInsert.category || 'Full-Stack',
+              category: categoryString,
               status: toInsert.status || 'Completed',
               progress: toInsert.progress || 100,
               repo_url: toInsert.repo_url || '',
@@ -175,7 +214,12 @@ export const api = {
 
     // Local cache update
     const current = getLocalData('projects', INITIAL_PROJECTS);
-    const savedItem = result || (project.id ? project : { ...project, id: `proj-${Date.now()}`, created_at: new Date().toISOString() });
+    const rawSaved = result || (project.id ? project : { ...project, id: `proj-${Date.now()}`, created_at: new Date().toISOString() });
+    const savedItem = {
+      ...rawSaved,
+      category: categoryString,
+      categories: categoriesArray
+    };
     const exists = current.some(p => p.id === savedItem.id);
     const updated = exists ? current.map(p => p.id === savedItem.id ? savedItem : p) : [savedItem, ...current];
     saveLocalData('projects', updated);
@@ -434,10 +478,14 @@ export const api = {
           .from('documents')
           .getPublicUrl(filePath);
 
+        const formattedSize = file.size < 1024 * 1024
+          ? (file.size / 1024).toFixed(1) + ' KB'
+          : (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+
         return {
           url: publicUrl,
           name: file.name,
-          size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+          size: formattedSize,
           content: previewContent
         };
       } catch (e) {
@@ -450,10 +498,14 @@ export const api = {
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => {
+        const formattedSize = file.size < 1024 * 1024
+          ? (file.size / 1024).toFixed(1) + ' KB'
+          : (file.size / (1024 * 1024)).toFixed(1) + ' MB';
+
         resolve({
           url: reader.result,
           name: file.name,
-          size: (file.size / (1024 * 1024)).toFixed(2) + ' MB',
+          size: formattedSize,
           content: previewContent || (typeof reader.result === 'string' ? reader.result : '')
         });
       };

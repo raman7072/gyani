@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { copyShareLink } from '../utils/share';
 import { GithubIcon } from './GithubIcon';
+import { getProjectCategories } from '../services/supabase';
 
 export function ProjectsPage({ projects, onOpenProjectModal }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,7 +31,7 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
   const categories = useMemo(() => {
     const set = new Set(['All']);
     projects.forEach(p => {
-      if (p.category) set.add(p.category);
+      getProjectCategories(p).forEach(cat => set.add(cat));
     });
     return Array.from(set);
   }, [projects]);
@@ -39,12 +40,14 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
 
   const filteredProjects = useMemo(() => {
     return projects.filter(project => {
+      const cats = getProjectCategories(project);
       const matchesSearch = 
         project.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         project.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        project.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+        project.tags?.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        cats.some(cat => cat.toLowerCase().includes(searchTerm.toLowerCase()));
 
-      const matchesCategory = selectedCategory === 'All' || project.category === selectedCategory;
+      const matchesCategory = selectedCategory === 'All' || cats.includes(selectedCategory);
       const matchesStatus = selectedStatus === 'All' || project.status === selectedStatus;
 
       return matchesSearch && matchesCategory && matchesStatus;
@@ -56,19 +59,11 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
       {/* Page Header */}
       <div className="page-header" style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-end', gap: '16px' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-            <span className="paper-stamp paper-stamp-active">
-              CATALOG
-            </span>
-            <span className="paper-stamp">
-              OPEN SOURCE REPOSITORIES
-            </span>
-          </div>
           <h1 style={{ fontSize: 'clamp(2rem, 4vw, 2.8rem)', marginBottom: '6px' }}>
-            Projects Directory
+            Projects
           </h1>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem', maxWidth: '640px', fontFamily: 'var(--font-serif)' }}>
-            Complete register of software systems, distributed services, and experiments. Direct links to GitHub repositories and architecture design notes.
+            Software systems, distributed services, and experiments with repository links and architecture notes.
           </p>
         </div>
 
@@ -139,7 +134,7 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
             Category:
           </span>
           {categories.map(cat => {
-            const count = cat === 'All' ? projects.length : projects.filter(p => p.category === cat).length;
+            const count = cat === 'All' ? projects.length : projects.filter(p => getProjectCategories(p).includes(cat)).length;
             return (
               <button
                 key={cat}
@@ -159,8 +154,8 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
       {viewMode === 'grid' && (
         <div style={{ 
           display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 280px), 1fr))', 
-          gap: '20px' 
+          gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', 
+          gap: '22px' 
         }}>
           {filteredProjects.map((project) => (
             <div 
@@ -176,10 +171,14 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
             >
               <div>
                 {/* Status and Category */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                  <span className="paper-stamp">
-                    {project.category}
-                  </span>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '14px', gap: '8px', flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {getProjectCategories(project).map((cat, idx) => (
+                      <span key={idx} className="paper-stamp">
+                        {cat}
+                      </span>
+                    ))}
+                  </div>
 
                   <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`}>
                     {project.status}
@@ -192,28 +191,32 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                 </h3>
 
                 {/* Description */}
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
-                  {project.description}
-                </p>
+                {project.description && (
+                  <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '16px' }}>
+                    {project.description}
+                  </p>
+                )}
 
                 {/* Tech Tags */}
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '18px' }}>
-                  {project.tags?.map((tag) => (
-                    <span 
-                      key={tag} 
-                      className="mono-stamp"
-                      style={{ 
-                        padding: '2px 6px', 
-                        borderRadius: '3px', 
-                        background: 'var(--bg-secondary)', 
-                        border: '1px solid var(--border-color)',
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+                {project.tags && project.tags.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '18px' }}>
+                    {project.tags.map((tag) => (
+                      <span 
+                        key={tag} 
+                        className="mono-stamp"
+                        style={{ 
+                          padding: '2px 6px', 
+                          borderRadius: '3px', 
+                          background: 'var(--bg-secondary)', 
+                          border: '1px solid var(--border-color)',
+                          color: 'var(--text-secondary)'
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Card Footer Actions */}
@@ -321,9 +324,13 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
                     </div>
                   </td>
                   <td style={{ padding: '14px' }}>
-                    <span className="paper-stamp">
-                      {project.category}
-                    </span>
+                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '240px' }}>
+                      {getProjectCategories(project).map((cat, idx) => (
+                        <span key={idx} className="paper-stamp" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                          {cat}
+                        </span>
+                      ))}
+                    </div>
                   </td>
                   <td style={{ padding: '14px' }}>
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '200px' }}>

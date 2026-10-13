@@ -39,9 +39,11 @@ function App() {
 
   // Navigation tab
   const [activeTab, setActiveTab] = useState(() => {
-    const hash = window.location.hash.replace('#', '');
-    if (['projects', 'notes', 'docs', 'admin'].includes(hash)) {
-      return hash === 'admin' ? 'overview' : hash;
+    if (typeof window === 'undefined') return 'overview';
+    const rawHash = (window.location.hash || '').trim();
+    const cleanTab = rawHash.replace(/^#\/?/, '').split(/[?&#]/)[0].toLowerCase();
+    if (['projects', 'notes', 'docs'].includes(cleanTab)) {
+      return cleanTab;
     }
     return 'overview';
   });
@@ -85,58 +87,100 @@ function App() {
     loadAllData();
   }, []);
 
-  // Synchronize active tab and modals with URL hash (#project=id, #note=id, #doc=id/slug, #admin, etc.)
+  // Synchronize active tab and modals with URL hash (#project=id, #note=id, #doc=id/slug, #admin, #projects, #notes, #docs, #overview, or root URL)
   const syncRouteFromHash = () => {
     if (typeof window === 'undefined') return;
     const rawHash = (window.location.hash || '').trim();
 
+    // Curator Admin route check
     if (isAdminRoute()) {
       setAdminOpen(true);
       return;
+    } else {
+      setAdminOpen(false);
     }
 
-    // Direct Project link: #project=xyz or #projects?id=xyz
-    const projMatch = rawHash.match(/^#\/?projects?(?:[=?&](?:id=)?([a-zA-Z0-9_.-]+)|$)/i);
-    if (projMatch) {
+    // 1. Direct Project modal link: #project=xyz or #projects?id=xyz or #projects/xyz
+    const projDetailMatch = rawHash.match(/^#\/?projects?[=?/&](?:id=)?([a-zA-Z0-9_.-]+)/i);
+    if (projDetailMatch && projDetailMatch[1]) {
+      const targetId = projDetailMatch[1];
+      const found = projects.find(
+        p => String(p.id) === targetId || p.title?.toLowerCase().replace(/\s+/g, '-') === targetId.toLowerCase()
+      );
+      if (found) {
+        setSelectedProject(found);
+      }
       setActiveTab('projects');
-      const targetId = projMatch[1];
-      if (targetId) {
-        const found = projects.find(p => String(p.id) === targetId || p.title?.toLowerCase().replace(/\s+/g, '-') === targetId.toLowerCase());
-        if (found) setSelectedProject(found);
-      }
+      setSelectedNote(null);
+      setSelectedDocId(null);
       return;
     }
 
-    // Direct Note / Manuscript link: #note=xyz or #notes?id=xyz
-    const noteMatch = rawHash.match(/^#\/?notes?(?:[=?&](?:id=)?([a-zA-Z0-9_.-]+)|$)/i);
-    if (noteMatch) {
+    // 2. Direct Note / Manuscript link: #note=xyz or #notes?id=xyz or #notes/xyz
+    const noteDetailMatch = rawHash.match(/^#\/?notes?[=?/&](?:id=)?([a-zA-Z0-9_.-]+)/i);
+    if (noteDetailMatch && noteDetailMatch[1]) {
+      const targetId = noteDetailMatch[1];
+      const found = notes.find(n => String(n.id) === targetId);
+      if (found) {
+        setSelectedNote(found);
+      }
       setActiveTab('notes');
-      const targetId = noteMatch[1];
-      if (targetId) {
-        const found = notes.find(n => String(n.id) === targetId);
-        if (found) setSelectedNote(found);
-      }
+      setSelectedProject(null);
+      setSelectedDocId(null);
       return;
     }
 
-    // Direct Documentation link with document ID (#doc=1, #doc/1, #docs?id=1, etc.)
-    const docParamMatch = rawHash.match(/^#\/?docs?(?:[=?/&](?:id=|slug=|index=)?([a-zA-Z0-9_.-]+))/i);
+    // 3. Direct Documentation link with document ID (#doc=1, #doc/1, #docs?id=1, etc.)
+    const docParamMatch = rawHash.match(/^#\/?docs?[=?/&](?:id=|slug=|index=)?([a-zA-Z0-9_.-]+)/i);
     if (docParamMatch && docParamMatch[1]) {
       setActiveTab('docs');
       setSelectedDocId(docParamMatch[1]);
+      setSelectedProject(null);
+      setSelectedNote(null);
       return;
     }
 
-    // Standard primary tab links: #overview, #projects, #notes, #docs
-    const cleanTab = rawHash.replace(/^#\/?/, '').toLowerCase();
-    if (['projects', 'notes', 'docs', 'overview'].includes(cleanTab)) {
-      setActiveTab(cleanTab);
+    // 4. Tab links: #overview, #projects, #notes, #docs, or empty hash (root index page)
+    const cleanTab = rawHash.replace(/^#\/?/, '').split(/[?&#]/)[0].toLowerCase();
+
+    // If there is no hash, or hash is '#' / '#/' / '#overview', route to Index ('overview')
+    if (!cleanTab || cleanTab === 'overview') {
+      setActiveTab('overview');
       setSelectedProject(null);
       setSelectedNote(null);
-      if (cleanTab === 'docs') {
-        setSelectedDocId(null);
-      }
+      setSelectedDocId(null);
+      return;
     }
+
+    if (cleanTab === 'projects') {
+      setActiveTab('projects');
+      setSelectedProject(null);
+      setSelectedNote(null);
+      setSelectedDocId(null);
+      return;
+    }
+
+    if (cleanTab === 'notes') {
+      setActiveTab('notes');
+      setSelectedProject(null);
+      setSelectedNote(null);
+      setSelectedDocId(null);
+      return;
+    }
+
+    if (cleanTab === 'docs' || cleanTab === 'documentation') {
+      setActiveTab('docs');
+      setSelectedProject(null);
+      setSelectedNote(null);
+      setSelectedDocId(null);
+      return;
+    }
+
+    // Fallback for any other unmatched hash: return to Index
+    setActiveTab('overview');
+    setSelectedProject(null);
+    setSelectedNote(null);
+    setSelectedDocId(null);
   };
 
   // Re-sync hash route whenever data loads from backend or localStorage
@@ -157,11 +201,83 @@ function App() {
     };
   }, [projects, notes, docs]);
 
+  const handleOpenAdmin = () => {
+    setAdminOpen(true);
+    window.history.pushState(null, '', '#admin');
+  };
+
   const handleCloseAdmin = () => {
     setAdminOpen(false);
     if (isAdminRoute()) {
-      window.history.pushState(null, "", window.location.pathname);
+      window.history.pushState(
+        null,
+        '',
+        activeTab === 'overview' ? (window.location.pathname + window.location.search) : `#${activeTab}`
+      );
     }
+  };
+
+  const handleNavigateTab = (tab) => {
+    setActiveTab(tab);
+    setSelectedProject(null);
+    setSelectedNote(null);
+    if (tab === 'docs') {
+      setSelectedDocId(null);
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (tab === 'overview') {
+      window.history.pushState(null, '', window.location.pathname + window.location.search);
+    } else {
+      window.location.hash = `#${tab}`;
+    }
+  };
+
+  const handleOpenProject = (project) => {
+    setSelectedProject(project);
+    window.history.pushState(null, '', `#project=${encodeURIComponent(project.id)}`);
+  };
+
+  const handleCloseProject = () => {
+    setSelectedProject(null);
+    if (activeTab === 'overview') {
+      window.history.pushState(null, '', window.location.pathname + window.location.search);
+    } else {
+      window.history.pushState(null, '', '#projects');
+    }
+  };
+
+  const handleOpenNote = (note) => {
+    setSelectedNote(note);
+    window.history.pushState(null, '', `#note=${encodeURIComponent(note.id)}`);
+  };
+
+  const handleCloseNote = () => {
+    setSelectedNote(null);
+    if (activeTab === 'overview') {
+      window.history.pushState(null, '', window.location.pathname + window.location.search);
+    } else {
+      window.history.pushState(null, '', '#notes');
+    }
+  };
+
+  const handleSelectDoc = (doc) => {
+    if (!doc) {
+      setSelectedDocId(null);
+      if (activeTab === 'overview') {
+        window.history.pushState(null, '', window.location.pathname + window.location.search);
+      } else {
+        window.history.pushState(null, '', '#docs');
+      }
+      return;
+    }
+    const docIndex = doc.order_index ?? (docs.findIndex(d => d.id === doc.id) + 1);
+    setSelectedDocId(String(docIndex));
+    window.history.pushState(null, '', `#doc=${docIndex}`);
+  };
+
+  // Toggle Dark/Light mode
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
   // Global Keyboard Shortcuts (Cmd+K for search, Esc to close, ? for shortcuts, 1-4 for tabs, T for theme)
@@ -173,7 +289,11 @@ function App() {
       // Curator hotkey: Cmd+Shift+A or Ctrl+Shift+A
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
         e.preventDefault();
-        setAdminOpen(prev => !prev);
+        if (adminOpen) {
+          handleCloseAdmin();
+        } else {
+          handleOpenAdmin();
+        }
         return;
       }
 
@@ -186,14 +306,22 @@ function App() {
       if (e.key === 'Escape') {
         setSearchOpen(false);
         setShortcutsOpen(false);
-        setSelectedNote(null);
-        setSelectedProject(null);
+        if (selectedNote) {
+          handleCloseNote();
+          return;
+        }
+        if (selectedProject) {
+          handleCloseProject();
+          return;
+        }
         if (selectedDocId) {
           handleSelectDoc(null);
           return;
         }
-        handleCloseAdmin();
-        return;
+        if (adminOpen) {
+          handleCloseAdmin();
+          return;
+        }
       }
 
       // Help shortcuts modal (?)
@@ -215,56 +343,7 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [searchOpen, shortcutsOpen, selectedNote, selectedProject, adminOpen, selectedDocId, theme]);
-
-  const handleNavigateTab = (tab) => {
-    setActiveTab(tab);
-    if (tab === 'docs') {
-      setSelectedDocId(null);
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (tab === 'overview') {
-      window.history.pushState(null, '', window.location.pathname + window.location.search);
-    } else {
-      window.location.hash = `#${tab}`;
-    }
-  };
-
-  const handleOpenProject = (project) => {
-    setSelectedProject(project);
-    window.history.pushState(null, '', `#project=${encodeURIComponent(project.id)}`);
-  };
-
-  const handleCloseProject = () => {
-    setSelectedProject(null);
-    window.history.pushState(null, '', '#projects');
-  };
-
-  const handleOpenNote = (note) => {
-    setSelectedNote(note);
-    window.history.pushState(null, '', `#note=${encodeURIComponent(note.id)}`);
-  };
-
-  const handleCloseNote = () => {
-    setSelectedNote(null);
-    window.history.pushState(null, '', '#notes');
-  };
-
-  const handleSelectDoc = (doc) => {
-    if (!doc) {
-      setSelectedDocId(null);
-      window.history.pushState(null, '', '#docs');
-      return;
-    }
-    const docIndex = doc.order_index ?? (docs.findIndex(d => d.id === doc.id) + 1);
-    setSelectedDocId(String(docIndex));
-    window.history.pushState(null, '', `#doc=${docIndex}`);
-  };
-
-  // Toggle Dark/Light mode
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
+  }, [searchOpen, shortcutsOpen, selectedNote, selectedProject, adminOpen, selectedDocId, theme, activeTab]);
 
   // Download Note handler
   const handleDownloadNote = (note) => {
@@ -297,10 +376,10 @@ function App() {
   const handleSelectSearchResult = (type, item) => {
     if (type === 'project') {
       handleNavigateTab('projects');
-      setSelectedProject(item);
+      handleOpenProject(item);
     } else if (type === 'note') {
       handleNavigateTab('notes');
-      setSelectedNote(item);
+      handleOpenNote(item);
     } else if (type === 'doc') {
       handleNavigateTab('docs');
       handleSelectDoc(item);
@@ -321,8 +400,8 @@ function App() {
         onOpenSearch={() => setSearchOpen(true)}
       />
 
-      {/* Main Content Area */}
-      <main className={`main-container ${activeTab === "docs" ? "main-container-wide" : ""}`}>
+      {/* Main Content Area — Full Wide Layout across Index, Projects, Notes, and Docs */}
+      <main className="main-container main-container-wide">
         <div key={activeTab} className="paper-tab-fade">
           {activeTab === 'overview' && (
             <Overview
@@ -333,6 +412,7 @@ function App() {
               onOpenProjectModal={handleOpenProject}
               onOpenNoteModal={handleOpenNote}
               onOpenSearch={() => setSearchOpen(true)}
+              onSelectDoc={handleSelectDoc}
             />
           )}
 
@@ -361,12 +441,12 @@ function App() {
         </div>
       </main>
 
-      {/* Minimalist Colophon / Footer */}
+      {/* Minimalist Colophon / Footer — Wide Alignment */}
       <footer style={{
         width: '100%',
-        maxWidth: '1180px',
+        maxWidth: '1560px',
         margin: '0 auto',
-        padding: '0 20px 48px 20px',
+        padding: '0 clamp(14px, 2.5vw, 36px) 48px clamp(14px, 2.5vw, 36px)',
         position: 'relative',
         zIndex: 10
       }}>
@@ -413,7 +493,7 @@ function App() {
             </button>
 
             <button
-              onClick={() => setAdminOpen(true)}
+              onClick={handleOpenAdmin}
               className="paper-stamp"
               style={{ cursor: 'pointer', background: 'transparent' }}
               title="Curator Console (or press ⌘Shift+A / visit /#admin)"
