@@ -148,95 +148,97 @@ export function NotesPage({ notes, onOpenNoteModal, onDownloadNote }) {
         </div>
       </div>
 
-      {/* Directory Table View */}
+      {/* Directory View (matches Recent Documents style from Overview) */}
       {viewMode === 'directory' && filteredNotes.length > 0 && (
-        <div className="paper-table-wrapper">
-          <table className="paper-table">
-            <thead>
-              <tr>
-                <th style={{ width: '38%' }}>Manuscript / File</th>
-                <th style={{ width: '18%' }}>Category</th>
-                <th style={{ width: '16%' }}>Format & Size</th>
-                <th style={{ width: '14%' }}>Tags</th>
-                <th style={{ width: '14%', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredNotes.map((note) => (
-                <tr key={note.id} className="paper-table-row">
-                  <td>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '2px', fontFamily: 'var(--font-serif)' }}>
+        <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+              <FileText size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
+              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Documents
+              </h3>
+            </div>
+            <span className="mono-stamp" style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+              {filteredNotes.length} {filteredNotes.length === 1 ? 'Document' : 'Documents'}
+            </span>
+          </div>
+
+          <div className="dashboard-mini-table">
+            {filteredNotes.map((note) => {
+              const type = (note.file_type || 'DOC').toUpperCase();
+              const typeClass = type === 'PDF' ? 'paper-stamp-red' : type === 'DOCX' ? 'paper-stamp-blue' : '';
+
+              return (
+                <div 
+                  key={note.id} 
+                  className="dashboard-mini-row"
+                  onClick={() => onOpenNoteModal(note)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <div className="dashboard-mini-info">
+                    <div className="dashboard-mini-title" title={note.title}>
                       {note.title}
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: '2px' }}>
-                      {note.file_name}
-                    </div>
                     {note.description && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '400px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div className="dashboard-mini-desc">
                         {note.description}
                       </div>
                     )}
-                  </td>
-                  <td>
-                    <span className="paper-stamp" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
-                      {note.category || 'General'}
-                    </span>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span className={`paper-stamp ${note.file_type === 'PDF' ? 'paper-stamp-red' : note.file_type === 'DOCX' ? 'paper-stamp-blue' : ''}`} style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
-                        {note.file_type}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
+                      <span className={`paper-stamp ${typeClass}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
+                        {type}
                       </span>
+                      {note.category && (
+                        <span className="paper-stamp" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
+                          {note.category}
+                        </span>
+                      )}
                       {note.file_size && (
-                        <span className="mono-stamp" style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem' }}>
+                        <span className="mono-stamp" style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>
                           {note.file_size}
                         </span>
                       )}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '180px' }}>
-                      {note.tags?.slice(0, 3).map((tag) => (
-                        <span key={tag} className="mono-stamp" style={{ padding: '1px 5px', borderRadius: '3px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontSize: '0.68rem' }}>
+                      {note.tags?.slice(0, 2).map((tag) => (
+                        <span key={tag} className="mono-stamp" style={{ fontSize: '0.65rem', padding: '0 4px', color: 'var(--text-secondary)' }}>
                           #{tag}
                         </span>
                       ))}
                     </div>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: '6px' }}>
-                      <button
-                        onClick={() => onOpenNoteModal(note)}
-                        className="paper-btn paper-btn-sm"
-                        style={{ padding: '5px 9px', fontSize: '0.78rem' }}
-                        title="View document in full-screen reader form"
-                      >
-                        <Eye size={13} />
-                        <span className="hide-on-mobile">View</span>
-                      </button>
-                      <button
-                        onClick={(e) => handleShareNote(e, note)}
-                        className="paper-btn paper-btn-sm"
-                        style={{ padding: '5px 8px' }}
-                        title="Copy share link"
-                      >
-                        {copiedId === note.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
-                      </button>
+                  </div>
+
+                  <div className="dashboard-mini-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => onOpenNoteModal(note)}
+                      className="paper-btn paper-btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+                      title="Open viewer"
+                    >
+                      Open
+                    </button>
+                    <button
+                      onClick={(e) => handleShareNote(e, note)}
+                      className="paper-btn paper-btn-icon"
+                      style={{ padding: '4px' }}
+                      title="Share document link"
+                    >
+                      {copiedId === note.id ? <Check size={12} color="var(--accent-stamp-sage)" /> : <Share2 size={12} />}
+                    </button>
+                    {onDownloadNote && (
                       <button
                         onClick={() => onDownloadNote(note)}
                         className="paper-btn paper-btn-primary paper-btn-sm"
-                        style={{ padding: '5px 10px', fontSize: '0.78rem' }}
+                        style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         title="Download document file"
                       >
-                        <Download size={13} />
-                        <span className="hide-on-mobile">Download</span>
+                        <Download size={11} />
+                        <span className="hide-on-mobile">Save</span>
                       </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

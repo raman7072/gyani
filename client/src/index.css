@@ -1553,14 +1553,44 @@ textarea.paper-input {
   flex-shrink: 0;
 }
 
+.dashboard-mini-desc {
+  font-size: 0.76rem;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 650px;
+}
+
+@media (max-width: 768px) {
+  .dashboard-mini-desc {
+    max-width: 380px;
+  }
+}
+
 @media (max-width: 480px) {
   .dashboard-mini-row {
-    padding: 8px 4px;
-    gap: 6px;
+    padding: 8px 6px;
+    gap: 8px;
   }
 
   .dashboard-mini-title {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
+  }
+
+  .dashboard-mini-desc {
+    max-width: 210px;
+    font-size: 0.72rem;
+  }
+
+  .dashboard-mini-actions {
+    gap: 4px;
+  }
+
+  .dashboard-mini-actions .paper-btn {
+    padding: 3px 6px;
+    font-size: 0.7rem;
   }
 }
 

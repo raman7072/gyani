@@ -331,108 +331,107 @@ export function ProjectsPage({ projects, onOpenProjectModal }) {
         </div>
       )}
 
-      {/* Directory Table View */}
+      {/* Directory View (matches Recent Repositories style from Overview) */}
       {viewMode === 'directory' && filteredProjects.length > 0 && (
-        <div className="paper-table-wrapper">
-          <table className="paper-table">
-            <thead>
-              <tr>
-                <th style={{ width: '36%' }}>Manuscript / Project</th>
-                <th style={{ width: '18%' }}>Category</th>
-                <th style={{ width: '18%' }}>Tech Stack</th>
-                <th style={{ width: '12%' }}>Status</th>
-                <th style={{ width: '16%', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredProjects.map((project) => (
-                <tr 
-                  key={project.id}
-                  className="paper-table-row"
+        <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+              <FolderGit2 size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
+              <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                Repositories
+              </h3>
+            </div>
+            <span className="mono-stamp" style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+              {filteredProjects.length} {filteredProjects.length === 1 ? 'Repository' : 'Repositories'}
+            </span>
+          </div>
+
+          <div className="dashboard-mini-table">
+            {filteredProjects.map((project) => {
+              const isBeta = project.status === 'Active' || project.status === 'Beta Testing' || project.status === 'βeta testing' || project.status === 'Beta' || project.status === 'βeta';
+              const statusLabel = isBeta ? 'βeta' : project.status;
+              const statusClass = project.status === 'Completed' ? 'paper-stamp-sage' : (isBeta ? 'paper-stamp-red' : '');
+
+              return (
+                <div 
+                  key={project.id} 
+                  className="dashboard-mini-row"
+                  onClick={() => onOpenProjectModal(project)}
+                  style={{ cursor: 'pointer' }}
                 >
-                  <td>
-                    <div style={{ fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.95rem', marginBottom: '2px', fontFamily: 'var(--font-serif)' }}>
+                  <div className="dashboard-mini-info">
+                    <div className="dashboard-mini-title" title={project.title}>
                       {project.title}
                     </div>
                     {project.description && (
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', maxWidth: '380px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <div className="dashboard-mini-desc">
                         {project.description}
                       </div>
                     )}
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '240px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
                       {getProjectCategories(project).map((cat, idx) => (
-                        <span key={idx} className="paper-stamp" style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
+                        <span key={idx} className="paper-stamp" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
                           {cat}
                         </span>
                       ))}
-                    </div>
-                  </td>
-                  <td>
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', maxWidth: '200px' }}>
+                      <span className={`paper-stamp ${statusClass}`} style={{ fontSize: '0.65rem', padding: '0 4px' }}>
+                        {statusLabel}
+                      </span>
                       {project.tags?.slice(0, 3).map(tag => (
-                        <span key={tag} className="mono-stamp" style={{ padding: '1px 5px', borderRadius: '3px', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', fontSize: '0.68rem' }}>
+                        <span key={tag} className="mono-stamp" style={{ fontSize: '0.65rem', padding: '0 4px', color: 'var(--text-secondary)' }}>
                           {tag}
                         </span>
                       ))}
                     </div>
-                  </td>
-                  <td>
-                    <span className={`paper-stamp ${project.status === 'Completed' ? 'paper-stamp-sage' : 'paper-stamp-red'}`} style={{ fontSize: '0.68rem', padding: '1px 6px' }}>
-                      {(project.status === 'Active' || project.status === 'Beta Testing' || project.status === 'βeta testing' || project.status === 'Beta') ? 'βeta' : project.status}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    <div style={{ display: 'inline-flex', gap: '6px' }}>
-                      <button
-                        onClick={() => onOpenProjectModal(project)}
-                        className="paper-btn paper-btn-sm"
-                        style={{ padding: '5px 8px' }}
-                        title="View Architecture Notes"
+                  </div>
+
+                  <div className="dashboard-mini-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => onOpenProjectModal(project)}
+                      className="paper-btn paper-btn-sm"
+                      style={{ fontSize: '0.72rem', padding: '3px 8px' }}
+                      title="Inspect specs"
+                    >
+                      Inspect
+                    </button>
+                    {project.repo_url && (
+                      <a
+                        href={project.repo_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="paper-btn paper-btn-icon"
+                        style={{ padding: '4px' }}
+                        title="GitHub"
                       >
-                        <Info size={13} />
-                      </button>
-                      <button
-                        onClick={(e) => handleShareProject(e, project)}
-                        className="paper-btn paper-btn-sm"
-                        style={{ padding: '5px 8px' }}
-                        title="Share project link"
+                        <GithubIcon size={12} />
+                      </a>
+                    )}
+                    {project.demo_url && (
+                      <a
+                        href={project.demo_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="paper-btn paper-btn-primary paper-btn-sm"
+                        style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                        title="Live Deployment"
                       >
-                        {copiedId === project.id ? <Check size={13} color="var(--accent-stamp-sage)" /> : <Share2 size={13} />}
-                      </button>
-                      {project.repo_url && (
-                        <a
-                          href={project.repo_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="paper-btn paper-btn-sm"
-                          style={{ padding: '5px 9px' }}
-                          title="Check out GitHub Repository"
-                        >
-                          <GithubIcon size={13} />
-                          <span className="hide-on-mobile">Repo</span>
-                        </a>
-                      )}
-                      {project.demo_url && (
-                        <a
-                          href={project.demo_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="paper-btn paper-btn-primary paper-btn-sm"
-                          style={{ padding: '5px 9px' }}
-                          title="Open Live Deployment"
-                        >
-                          <ExternalLink size={13} />
-                          <span className="hide-on-mobile">Live</span>
-                        </a>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <ExternalLink size={11} />
+                        <span className="hide-on-mobile">Live</span>
+                      </a>
+                    )}
+                    <button
+                      onClick={(e) => handleShareProject(e, project)}
+                      className="paper-btn paper-btn-icon"
+                      style={{ padding: '4px' }}
+                      title="Share project link"
+                    >
+                      {copiedId === project.id ? <Check size={12} color="var(--accent-stamp-sage)" /> : <Share2 size={12} />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 

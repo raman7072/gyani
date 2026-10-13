@@ -885,87 +885,81 @@ export function DocsPage({ docs, activeDocId: controlledDocId, onSelectDoc }) {
           </div>
         )}
 
-        {/* DIRECTORY TABLE VIEW */}
-        {viewMode === 'directory' && (
-          <div className="paper-table-wrapper docs-directory-table-wrapper" style={{ padding: '0' }}>
-            <table className="paper-table docs-directory-table">
-              <thead>
-                <tr>
-                  <th style={{ width: '85px' }}>INDEX</th>
-                  <th>MANUSCRIPT TITLE & SUMMARY</th>
-                  <th style={{ width: '140px' }}>DOMAIN</th>
-                  <th style={{ width: '220px' }}>KEY SECTIONS</th>
-                  <th style={{ width: '110px' }}>EST. READ</th>
-                  <th style={{ width: '130px', textAlign: 'right' }}>ACTION</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredDocs.map((doc) => {
-                  const docIndex = doc.order_index ?? (docs.findIndex(d => d.id === doc.id) + 1);
-                  const words = doc.content ? doc.content.trim().split(/\s+/).filter(Boolean).length : 0;
-                  const readTime = Math.max(1, Math.ceil(words / 180));
-                  const sections = extractDocHeadings(doc.content);
-                  const excerpt = getDocExcerpt(doc);
-                  const isCopied = copiedCardId === doc.id;
+        {/* DIRECTORY VIEW (matches Documentation style from Overview) */}
+        {viewMode === 'directory' && filteredDocs.length > 0 && (
+          <div className="paper-panel-subtle" style={{ padding: 'clamp(14px, 3.5vw, 20px)', borderRadius: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', paddingBottom: '10px', borderBottom: '1px solid var(--border-color)', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', minWidth: 0 }}>
+                <BookOpen size={15} color="var(--text-primary)" style={{ flexShrink: 0 }} />
+                <h3 style={{ fontSize: '0.96rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                  Documentation
+                </h3>
+              </div>
+              <span className="mono-stamp" style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                {filteredDocs.length} {filteredDocs.length === 1 ? 'Article' : 'Articles'}
+              </span>
+            </div>
 
-                  return (
-                    <tr 
-                      key={doc.id}
-                      className="docs-directory-row"
-                      onClick={() => handleSelectDoc(doc)}
-                    >
-                      <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--text-primary)', fontSize: '0.8rem' }}>
-                        #{docIndex}
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 600, fontSize: '0.94rem', color: 'var(--text-primary)', fontFamily: 'var(--font-serif)', marginBottom: '3px' }}>
-                          {doc.title}
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', maxWidth: '480px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            <div className="dashboard-mini-table">
+              {filteredDocs.map((doc) => {
+                const docIndex = doc.order_index ?? (docs.findIndex(d => d.id === doc.id) + 1);
+                const words = doc.content ? doc.content.trim().split(/\s+/).filter(Boolean).length : 0;
+                const readingTime = Math.max(1, Math.ceil(words / 180));
+                const excerpt = getDocExcerpt(doc);
+                const isCopied = copiedCardId === doc.id;
+
+                return (
+                  <div 
+                    key={doc.id} 
+                    className="dashboard-mini-row"
+                    onClick={() => handleSelectDoc(doc)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <div className="dashboard-mini-info">
+                      <div className="dashboard-mini-title" title={doc.title}>
+                        {doc.title}
+                      </div>
+                      {excerpt && (
+                        <div className="dashboard-mini-desc">
                           {excerpt}
                         </div>
-                      </td>
-                      <td>
-                        <span className="paper-stamp" style={{ fontSize: '0.68rem', padding: '1px 5px' }}>
+                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', marginTop: '3px', flexWrap: 'wrap' }}>
+                        <span className="paper-stamp paper-stamp-active" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
+                          #{docIndex}
+                        </span>
+                        <span className="paper-stamp paper-stamp-blue" style={{ fontSize: '0.65rem', padding: '0 4px' }}>
                           {doc.category || 'General'}
                         </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-                          {sections.slice(0, 2).map((sec, sIdx) => (
-                            <span key={sIdx} className="docs-section-pill" style={{ fontSize: '0.68rem', padding: '1px 5px' }}>
-                              § {sec}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td style={{ fontFamily: 'var(--font-mono)', fontSize: '0.76rem', color: 'var(--text-secondary)' }}>
-                        ~{readTime} min
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        <div style={{ display: 'inline-flex', gap: '6px' }}>
-                          <button
-                            onClick={(e) => handleShareDoc(e, doc)}
-                            className="paper-btn paper-btn-sm"
-                            style={{ padding: '3px 7px', fontSize: '0.72rem' }}
-                            title="Share link"
-                          >
-                            {isCopied ? <Check size={11} color="var(--accent-sage)" /> : <Share2 size={11} />}
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleSelectDoc(doc); }}
-                            className="paper-btn paper-btn-sm paper-btn-primary"
-                            style={{ padding: '3px 9px', fontSize: '0.72rem' }}
-                          >
-                            Read
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <span className="mono-stamp" style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          <Clock size={10} />
+                          ~{readingTime}m
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="dashboard-mini-actions" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={(e) => handleShareDoc(e, doc)}
+                        className="paper-btn paper-btn-icon"
+                        style={{ padding: '4px' }}
+                        title="Share link"
+                      >
+                        {isCopied ? <Check size={12} color="var(--accent-sage)" /> : <Share2 size={12} />}
+                      </button>
+                      <button
+                        onClick={() => handleSelectDoc(doc)}
+                        className="paper-btn paper-btn-primary paper-btn-sm"
+                        style={{ fontSize: '0.72rem', padding: '3px 8px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}
+                      >
+                        <span>Read</span>
+                        <ChevronRight size={11} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 
